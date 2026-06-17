@@ -61,15 +61,16 @@ OpenAI **speech-to-text** model. Converts audio to text.
 Lightweight neural network (Xiph/Mozilla) for **real-time voice enhancement**, designed for VoIP.
 
 
-|              |                                                            |
-| ------------ | ---------------------------------------------------------- |
-| **Label**    | `enhance_voice`                                            |
+|                    |                                                                    |
+| ------------------ | ------------------------------------------------------------------ |
+| **Label**          | `enhance_voice`                                                    |
 | **Implementation** | `pyrnnoise` (CPU, 16 kHz pipeline with internal 48 kHz processing) |
-| **Good for** | Human voice + moderate background noise, low latency       |
-| **Bad for**  | Already clean audio; rare medical terms without validation |
-| **Cost**     | Low (CPU)                                                  |
-| **Enable**   | `ENHANCE_VOICE_ENABLED=true` in `.env`                     |
-| **Pipeline** | After filters, before `agc` — same slot as `denoise`       |
+| **Good for**       | Human voice + moderate background noise, low latency               |
+| **Bad for**        | Already clean audio; rare medical terms without validation         |
+| **Cost**           | Low (CPU)                                                          |
+| **Enable**         | `ENHANCE_VOICE_ENABLED=true` in `.env`                             |
+| **Pipeline**       | After filters, before `agc` — same slot as `denoise`               |
+
 
 **Difference from `denoise`:** spectral gating (`noisereduce`) vs neural VoIP enhancer — **do not enable both**. For isolated RNNoise testing, also turn off `AGC_ENABLED`, `LOUDNESS_ENABLED`, `LPF_ENABLED`, and `ENHANCE_DEEP_ENABLED`.
 
@@ -80,15 +81,16 @@ Lightweight neural network (Xiph/Mozilla) for **real-time voice enhancement**, d
 **Deep learning** model (PyTorch) for speech enhancement — a reference in many complex noise scenarios.
 
 
-|              |                                                                    |
-| ------------ | ------------------------------------------------------------------ |
-| **Label**    | `enhance_deep`                                                     |
-| **Implementation** | `deepfilternet` (PyTorch, 48 kHz native, resampled in pipeline) |
-| **Good for** | **Non-stationary** noise, difficult recordings, offline processing |
-| **Bad for**  | Fast MVP, servers without GPU, already decent audio                |
-| **Cost**     | High (PyTorch, memory, inference time; GPU recommended)            |
-| **Enable**   | `ENHANCE_DEEP_ENABLED=true` in `.env`                              |
-| **Pipeline** | After filters, before `agc` — same slot as `denoise` / `enhance_voice` |
+|                    |                                                                        |
+| ------------------ | ---------------------------------------------------------------------- |
+| **Label**          | `enhance_deep`                                                         |
+| **Implementation** | `deepfilternet` (PyTorch, 48 kHz native, resampled in pipeline)        |
+| **Good for**       | **Non-stationary** noise, difficult recordings, offline processing     |
+| **Bad for**        | Fast MVP, servers without GPU, already decent audio                    |
+| **Cost**           | High (PyTorch, memory, inference time; GPU recommended)                |
+| **Enable**         | `ENHANCE_DEEP_ENABLED=true` in `.env`                                  |
+| **Pipeline**       | After filters, before `agc` — same slot as `denoise` / `enhance_voice` |
+
 
 **Difference from other denoisers:** `denoise` = spectral gating; `enhance_voice` = light RNNoise (CPU); `enhance_deep` = heavy deep model. **Enable only one.** First run may download the pretrained model (~tens of MB). Building `deepfilterlib` requires **Rust** on some platforms.
 
@@ -129,16 +131,16 @@ Measure of **perceived volume** (loudness), not just peak amplitude.
 - Better than peak normalization when speakers or recordings vary widely.
 
 
-|              |                                                                    |
-| ------------ | ------------------------------------------------------------------ |
-| **Label**    | `loudness`                                                         |
+|                    |                                                                   |
+| ------------------ | ----------------------------------------------------------------- |
+| **Label**          | `loudness`                                                        |
 | **Implementation** | `lufs` mode (ffmpeg `loudnorm`) or `peak` mode (max-peak scaling) |
-| **Good for** | Consultations with irregular volume between files or microphones   |
-| **Enable**   | `LOUDNESS_ENABLED=true`, `LOUDNESS_MODE=lufs` or `peak`          |
-| **Pipeline** | After `agc`, before `vad`                                          |
+| **Good for**       | Consultations with irregular volume between files or microphones  |
+| **Enable**         | `LOUDNESS_ENABLED=true`, `LOUDNESS_MODE=lufs` or `peak`           |
+| **Pipeline**       | After `agc`, before `vad`                                         |
 
-**`peak` mode** is simpler but less representative of perceived loudness than LUFS.
 
+`**peak` mode** is simpler but less representative of perceived loudness than LUFS.
 
 ---
 
@@ -153,7 +155,7 @@ Measure of **perceived volume** (loudness), not just peak amplitude.
 | **Implementation**       | RMS-based dynamic gain (scipy/numpy), after denoise       |
 | **Good for**             | Speaker far from the microphone, highly irregular volume  |
 | **Risk**                 | Raises background noise during silences; “pumping” effect |
-| **Difference from LUFS** | AGC is **dynamic**; LUFS is **global** per segment/file  |
+| **Difference from LUFS** | AGC is **dynamic**; LUFS is **global** per segment/file   |
 | **Enable**               | `AGC_ENABLED=true` in `.env`                              |
 
 
@@ -184,22 +186,48 @@ VAD is optional and should be validated so clinically relevant speech is not rem
 ## How the techniques complement each other
 
 
-| Layer                | Technique         | Problem type                              |
-| -------------------- | ----------------- | ----------------------------------------- |
-| `normalize`          | ffmpeg            | Wrong format (stereo, sample rate, codec) |
-| `remove_hum`         | HPF ~80 Hz (scipy) | 50/60 Hz hum, rumble                      |
-| `reduce_sibilance`   | LPF ~7.5 kHz       | Excessive sibilance (16 kHz audio)        |
-| `denoise_stationary` | noisereduce       | Steady hiss                               |
-| `agc`                | RMS compressor    | Segments too quiet/loud                   |
-| `loudness`           | LUFS / peak       | Inconsistent perceived volume across files |
-| `enhance_voice`      | RNNoise           | Room noise on voice                       |
-| `enhance_deep`       | DeepFilterNet     | Complex noise                             |
-| `vad`                | Silero VAD (trim) | Long silences                             |
+| Layer                | Technique          | Problem type                               |
+| -------------------- | ------------------ | ------------------------------------------ |
+| `normalize`          | ffmpeg             | Wrong format (stereo, sample rate, codec)  |
+| `remove_hum`         | HPF ~80 Hz (scipy) | 50/60 Hz hum, rumble                       |
+| `reduce_sibilance`   | LPF ~7.5 kHz       | Excessive sibilance (16 kHz audio)         |
+| `denoise_stationary` | noisereduce        | Steady hiss                                |
+| `agc`                | RMS compressor     | Segments too quiet/loud                    |
+| `loudness`           | LUFS / peak        | Inconsistent perceived volume across files |
+| `enhance_voice`      | RNNoise            | Room noise on voice                        |
+| `enhance_deep`       | DeepFilterNet      | Complex noise                              |
+| `vad`                | Silero VAD (trim)  | Long silences                              |
 
 
 **Rule:** do not stack all layers at maximum strength — validate with real transcription (WER or manual review).
 
 ---
+
+## Stack compatibility matrix (rows × columns)
+
+**Legend:** ✅ = can be used together in the same pipeline · ❌ = mutually exclusive or the column flag has no effect · — = same stage
+
+`normalize` always runs; it is included as a row/column for completeness.
+
+**Pipeline order:** `normalize` → `HPF` / `LPF` → **one denoiser** → `AGC` → `loudness` → `VAD`
+
+**Denoiser rule:** only one of `denoise`, `enhance_voice`, `enhance_deep` runs. If multiple are `true`: `enhance_deep` > `enhance_voice` > `denoise`.
+
+
+|                 | norm | HPF | LPF | denoise | RNNoise | DeepFilter | post_filter | atten_lim | AGC | loudness | VAD |
+| --------------- | ---- | --- | --- | ------- | ------- | ---------- | ----------- | --------- | --- | -------- | --- |
+| **normalize**   | —    | ✅   | ✅   | ✅       | ✅       | ✅          | ✅           | ✅         | ✅   | ✅        | ✅   |
+| **HPF**         | ✅    | —   | ✅   | ✅       | ✅       | ✅          | ✅           | ✅         | ✅   | ✅        | ✅   |
+| **LPF**         | ✅    | ✅   | —   | ✅       | ✅       | ✅          | ✅           | ✅         | ✅   | ✅        | ✅   |
+| **denoise**     | ✅    | ✅   | ✅   | —       | ❌       | ❌          | ❌           | ❌         | ✅   | ✅        | ✅   |
+| **RNNoise**     | ✅    | ✅   | ✅   | ❌       | —       | ❌          | ❌           | ❌         | ✅   | ✅        | ✅   |
+| **DeepFilter**  | ✅    | ✅   | ✅   | ❌       | ❌       | —          | ✅           | ✅         | ✅   | ✅        | ✅   |
+| **post_filter** | ✅    | ✅   | ✅   | ❌       | ❌       | ✅          | —           | ✅         | ✅   | ✅        | ✅   |
+| **atten_lim**   | ✅    | ✅   | ✅   | ❌       | ❌       | ✅          | ✅           | —         | ✅   | ✅        | ✅   |
+| **AGC**         | ✅    | ✅   | ✅   | ✅       | ✅       | ✅          | ✅           | ✅         | —   | ✅        | ✅   |
+| **loudness**    | ✅    | ✅   | ✅   | ✅       | ✅       | ✅          | ✅           | ✅         | ✅   | —        | ✅   |
+| **VAD**         | ✅    | ✅   | ✅   | ✅       | ✅       | ✅          | ✅           | ✅         | ✅   | ✅        | —   |
+
 
 ## Setup
 
@@ -226,14 +254,15 @@ Production will use the **OpenAI Whisper API** wired to our LLM. `faster-whisper
 **Optional preprocessing variables** (`.env`):
 
 
-| Variable                      | Default | Description                                                    |
-| ----------------------------- | ------- | -------------------------------------------------------------- |
-| `DENOISE_ENABLED`             | `false` | Enables spectral reduction (`noisereduce`)                     |
-| `DENOISE_PROP_DECREASE`       | `0.6`   | Denoise strength (0.0–1.0)                                     |
-| `ENHANCE_VOICE_ENABLED`       | `false` | RNNoise voice enhancement (`enhance_voice`) — after filters    |
-| `ENHANCE_DEEP_ENABLED`        | `false` | DeepFilterNet (`enhance_deep`) — after filters, before AGC     |
-| `ENHANCE_DEEP_MODEL`          | `DeepFilterNet3` | Pretrained model name or local model directory          |
-| `ENHANCE_DEEP_DEVICE`         | `cpu`   | `cpu` or `cuda` (falls back to CPU if CUDA unavailable)        |
+| Variable                | Default          | Description                                                 |
+| ----------------------- | ---------------- | ----------------------------------------------------------- |
+| `DENOISE_ENABLED`       | `false`          | Enables spectral reduction (`noisereduce`)                  |
+| `DENOISE_PROP_DECREASE` | `0.6`            | Denoise strength (0.0–1.0)                                  |
+| `ENHANCE_VOICE_ENABLED` | `false`          | RNNoise voice enhancement (`enhance_voice`) — after filters |
+| `ENHANCE_DEEP_ENABLED`  | `false`          | DeepFilterNet (`enhance_deep`) — after filters, before AGC  |
+| `ENHANCE_DEEP_MODEL`    | `DeepFilterNet3` | Pretrained model name or local model directory              |
+| `ENHANCE_DEEP_DEVICE`   | `cpu`            | `cpu` or `cuda` (falls back to CPU if CUDA unavailable)     |
+
 
 Upload metadata includes `requested_device`, resolved `device`, `model_device`, `cuda_available`, `fallback_to_cpu`, `fallback_reason` (`cuda_oom` when applicable), and `chunked` / `chunks_processed` for long CUDA runs.
 
@@ -259,24 +288,23 @@ Upload metadata includes `requested_device`, resolved `device`, `model_device`, 
 | `VAD_MIN_SILENCE_DURATION_MS` | `1000`  | Minimum silence to split segments (short pauses are preserved) |
 | `VAD_SPEECH_PAD_MS`           | `300`   | Padding before/after each speech segment                       |
 
-
 **Experimental transcription variables** (`.env`, local testing only):
 
 
-| Variable | Default | Description |
-| --- | --- | --- |
-| `WHISPER_FASTER_ENABLED` | `false` | Enables `POST /api/v1/audio/<file_id>/transcribe` |
-| `WHISPER_FASTER_MODEL` | `small` | Model size: `tiny`, `base`, `small`, `medium`, `large-v3` |
-| `WHISPER_FASTER_DEVICE` | `cpu` | `cpu` or `cuda` |
-| `WHISPER_FASTER_COMPUTE_TYPE` | `int8` | `int8` (CPU), `float16` (GPU) |
-| `WHISPER_FASTER_LANGUAGE` | `pt` | Language code |
-| `WHISPER_FASTER_BEAM_SIZE` | `5` | Beam search width |
-| `WHISPER_FASTER_INITIAL_PROMPT` | (clinical PT) | Optional prompt for medical Portuguese |
-| `WHISPER_FASTER_COMPRESSION_RATIO_THRESHOLD` | `2.4` | Reject repetitive segments above this gzip ratio (lower = stricter) |
-| `WHISPER_FASTER_LOG_PROB_THRESHOLD` | `-1.0` | Reject low-confidence segments (higher = stricter, e.g. `-0.8`) |
-| `WHISPER_FASTER_HALLUCINATION_SILENCE_THRESHOLD` | (unset) | Skip suspected hallucinations after N seconds of silence |
-| `WHISPER_FASTER_CONDITION_ON_PREVIOUS_TEXT` | `true` | Use prior segment as context (`false` can reduce repetition on long files) |
-| `WHISPER_FASTER_VAD_FILTER` | `false` | faster-whisper internal VAD (separate from upload `VAD_ENABLED`) |
+| Variable                                         | Default       | Description                                                                |
+| ------------------------------------------------ | ------------- | -------------------------------------------------------------------------- |
+| `WHISPER_FASTER_ENABLED`                         | `false`       | Enables `POST /api/v1/audio/<file_id>/transcribe`                          |
+| `WHISPER_FASTER_MODEL`                           | `small`       | Model size: `tiny`, `base`, `small`, `medium`, `large-v3`                  |
+| `WHISPER_FASTER_DEVICE`                          | `cpu`         | `cpu` or `cuda`                                                            |
+| `WHISPER_FASTER_COMPUTE_TYPE`                    | `int8`        | `int8` (CPU), `float16` (GPU)                                              |
+| `WHISPER_FASTER_LANGUAGE`                        | `pt`          | Language code                                                              |
+| `WHISPER_FASTER_BEAM_SIZE`                       | `5`           | Beam search width                                                          |
+| `WHISPER_FASTER_INITIAL_PROMPT`                  | (clinical PT) | Optional prompt for medical Portuguese                                     |
+| `WHISPER_FASTER_COMPRESSION_RATIO_THRESHOLD`     | `2.4`         | Reject repetitive segments above this gzip ratio (lower = stricter)        |
+| `WHISPER_FASTER_LOG_PROB_THRESHOLD`              | `-1.0`        | Reject low-confidence segments (higher = stricter, e.g. `-0.8`)            |
+| `WHISPER_FASTER_HALLUCINATION_SILENCE_THRESHOLD` | (unset)       | Skip suspected hallucinations after N seconds of silence                   |
+| `WHISPER_FASTER_CONDITION_ON_PREVIOUS_TEXT`      | `true`        | Use prior segment as context (`false` can reduce repetition on long files) |
+| `WHISPER_FASTER_VAD_FILTER`                      | `false`       | faster-whisper internal VAD (separate from upload `VAD_ENABLED`)           |
 
 
 ### Main endpoints
@@ -322,12 +350,14 @@ Upload and preprocessing work independently of Whisper. Transcription is a separ
 
 **Suggested A/B stacks:**
 
-| Stack | Settings |
-| ----- | -------- |
-| Baseline | all optional stages `false` |
+
+| Stack            | Settings                                                                            |
+| ---------------- | ----------------------------------------------------------------------------------- |
+| Baseline         | all optional stages `false`                                                         |
 | Spectral denoise | `DENOISE_ENABLED=true`, `ENHANCE_VOICE_ENABLED=false`, `ENHANCE_DEEP_ENABLED=false` |
-| RNNoise | `ENHANCE_VOICE_ENABLED=true`, `DENOISE_ENABLED=false`, `ENHANCE_DEEP_ENABLED=false` |
-| DeepFilterNet | `ENHANCE_DEEP_ENABLED=true`, `DENOISE_ENABLED=false`, `ENHANCE_VOICE_ENABLED=false` |
+| RNNoise          | `ENHANCE_VOICE_ENABLED=true`, `DENOISE_ENABLED=false`, `ENHANCE_DEEP_ENABLED=false` |
+| DeepFilterNet    | `ENHANCE_DEEP_ENABLED=true`, `DENOISE_ENABLED=false`, `ENHANCE_VOICE_ENABLED=false` |
+
 
 If multiple enhancer flags are `true`, precedence is: `enhance_deep` > `enhance_voice` > `denoise`.
 

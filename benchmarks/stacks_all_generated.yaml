@@ -1,0 +1,271 @@
+audio: public/anamnesia-4.mp3
+reference: benchmarks/references/anamnesia-4.txt
+whisper:
+  model: large-v3
+  device: cuda
+  compute_type: float16
+  language: pt
+  beam_size: 8
+  initial_prompt: pt-BR medical anamnesis transcription.
+  compression_ratio_threshold: 2.0
+  log_prob_threshold: -1.0
+  hallucination_silence_threshold: 1.5
+  condition_on_previous_text: false
+  vad_filter: false
+stacks:
+  baseline: {}
+  spectral:
+    DENOISE_ENABLED: true
+  spectral_vad:
+    DENOISE_ENABLED: true
+    VAD_ENABLED: true
+  spectral_loudness:
+    DENOISE_ENABLED: true
+    LOUDNESS_ENABLED: true
+  spectral_loudness_vad:
+    DENOISE_ENABLED: true
+    LOUDNESS_ENABLED: true
+    VAD_ENABLED: true
+  spectral_agc:
+    DENOISE_ENABLED: true
+    AGC_ENABLED: true
+  spectral_agc_vad:
+    DENOISE_ENABLED: true
+    AGC_ENABLED: true
+    VAD_ENABLED: true
+  spectral_agc_loudness:
+    DENOISE_ENABLED: true
+    AGC_ENABLED: true
+    LOUDNESS_ENABLED: true
+  spectral_agc_loudness_vad:
+    DENOISE_ENABLED: true
+    AGC_ENABLED: true
+    LOUDNESS_ENABLED: true
+    VAD_ENABLED: true
+  spectral_lpf:
+    DENOISE_ENABLED: true
+    LPF_ENABLED: true
+  spectral_lpf_vad:
+    DENOISE_ENABLED: true
+    LPF_ENABLED: true
+    VAD_ENABLED: true
+  spectral_lpf_loudness:
+    DENOISE_ENABLED: true
+    LPF_ENABLED: true
+    LOUDNESS_ENABLED: true
+  spectral_lpf_loudness_vad:
+    DENOISE_ENABLED: true
+    LPF_ENABLED: true
+    LOUDNESS_ENABLED: true
+    VAD_ENABLED: true
+  spectral_lpf_agc:
+    DENOISE_ENABLED: true
+    LPF_ENABLED: true
+    AGC_ENABLED: true
+  spectral_lpf_agc_vad:
+    DENOISE_ENABLED: true
+    LPF_ENABLED: true
+    AGC_ENABLED: true
+    VAD_ENABLED: true
+  spectral_lpf_agc_loudness:
+    DENOISE_ENABLED: true
+    LPF_ENABLED: true
+    AGC_ENABLED: true
+    LOUDNESS_ENABLED: true
+  spectral_lpf_agc_loudness_vad:
+    DENOISE_ENABLED: true
+    LPF_ENABLED: true
+    AGC_ENABLED: true
+    LOUDNESS_ENABLED: true
+    VAD_ENABLED: true
+  spectral_hpf:
+    DENOISE_ENABLED: true
+    HPF_ENABLED: true
+  spectral_hpf_vad:
+    DENOISE_ENABLED: true
+    HPF_ENABLED: true
+    VAD_ENABLED: true
+  spectral_hpf_loudness:
+    DENOISE_ENABLED: true
+    HPF_ENABLED: true
+    LOUDNESS_ENABLED: true
+  spectral_hpf_loudness_vad:
+    DENOISE_ENABLED: true
+    HPF_ENABLED: true
+    LOUDNESS_ENABLED: true
+    VAD_ENABLED: true
+  spectral_hpf_agc:
+    DENOISE_ENABLED: true
+    HPF_ENABLED: true
+    AGC_ENABLED: true
+  spectral_hpf_agc_vad:
+    DENOISE_ENABLED: true
+    HPF_ENABLED: true
+    AGC_ENABLED: true
+    VAD_ENABLED: true
+  spectral_hpf_agc_loudness:
+    DENOISE_ENABLED: true
+    HPF_ENABLED: true
+    AGC_ENABLED: true
+    LOUDNESS_ENABLED: true
+  spectral_hpf_agc_loudness_vad:
+    DENOISE_ENABLED: true
+    HPF_ENABLED: true
+    AGC_ENABLED: true
+    LOUDNESS_ENABLED: true
+    VAD_ENABLED: true
+  spectral_hpf_lpf:
+    DENOISE_ENABLED: true
+    HPF_ENABLED: true
+    LPF_ENABLED: true
+  spectral_hpf_lpf_vad:
+    DENOISE_ENABLED: true
+    HPF_ENABLED: true
+    LPF_ENABLED: true
+    VAD_ENABLED: true
+  spectral_hpf_lpf_loudness:
+    DENOISE_ENABLED: true
+    HPF_ENABLED: true
+    LPF_ENABLED: true
+    LOUDNESS_ENABLED: true
+  spectral_hpf_lpf_loudness_vad:
+    DENOISE_ENABLED: true
+    HPF_ENABLED: true
+    LPF_ENABLED: true
+    LOUDNESS_ENABLED: true
+    VAD_ENABLED: true
+  spectral_hpf_lpf_agc:
+    DENOISE_ENABLED: true
+    HPF_ENABLED: true
+    LPF_ENABLED: true
+    AGC_ENABLED: true
+  spectral_hpf_lpf_agc_vad:
+    DENOISE_ENABLED: true
+    HPF_ENABLED: true
+    LPF_ENABLED: true
+    AGC_ENABLED: true
+    VAD_ENABLED: true
+  spectral_hpf_lpf_agc_loudness:
+    DENOISE_ENABLED: true
+    HPF_ENABLED: true
+    LPF_ENABLED: true
+    AGC_ENABLED: true
+    LOUDNESS_ENABLED: true
+  spectral_hpf_lpf_agc_loudness_vad:
+    DENOISE_ENABLED: true
+    HPF_ENABLED: true
+    LPF_ENABLED: true
+    AGC_ENABLED: true
+    LOUDNESS_ENABLED: true
+    VAD_ENABLED: true
+  none_vad:
+    VAD_ENABLED: true
+  none_loudness:
+    LOUDNESS_ENABLED: true
+  none_loudness_vad:
+    LOUDNESS_ENABLED: true
+    VAD_ENABLED: true
+  none_agc:
+    AGC_ENABLED: true
+  none_agc_vad:
+    AGC_ENABLED: true
+    VAD_ENABLED: true
+  none_agc_loudness:
+    AGC_ENABLED: true
+    LOUDNESS_ENABLED: true
+  none_agc_loudness_vad:
+    AGC_ENABLED: true
+    LOUDNESS_ENABLED: true
+    VAD_ENABLED: true
+  none_lpf:
+    LPF_ENABLED: true
+  none_lpf_vad:
+    LPF_ENABLED: true
+    VAD_ENABLED: true
+  none_lpf_loudness:
+    LPF_ENABLED: true
+    LOUDNESS_ENABLED: true
+  none_lpf_loudness_vad:
+    LPF_ENABLED: true
+    LOUDNESS_ENABLED: true
+    VAD_ENABLED: true
+  none_lpf_agc:
+    LPF_ENABLED: true
+    AGC_ENABLED: true
+  none_lpf_agc_vad:
+    LPF_ENABLED: true
+    AGC_ENABLED: true
+    VAD_ENABLED: true
+  none_lpf_agc_loudness:
+    LPF_ENABLED: true
+    AGC_ENABLED: true
+    LOUDNESS_ENABLED: true
+  none_lpf_agc_loudness_vad:
+    LPF_ENABLED: true
+    AGC_ENABLED: true
+    LOUDNESS_ENABLED: true
+    VAD_ENABLED: true
+  none_hpf:
+    HPF_ENABLED: true
+  none_hpf_vad:
+    HPF_ENABLED: true
+    VAD_ENABLED: true
+  none_hpf_loudness:
+    HPF_ENABLED: true
+    LOUDNESS_ENABLED: true
+  none_hpf_loudness_vad:
+    HPF_ENABLED: true
+    LOUDNESS_ENABLED: true
+    VAD_ENABLED: true
+  none_hpf_agc:
+    HPF_ENABLED: true
+    AGC_ENABLED: true
+  none_hpf_agc_vad:
+    HPF_ENABLED: true
+    AGC_ENABLED: true
+    VAD_ENABLED: true
+  none_hpf_agc_loudness:
+    HPF_ENABLED: true
+    AGC_ENABLED: true
+    LOUDNESS_ENABLED: true
+  none_hpf_agc_loudness_vad:
+    HPF_ENABLED: true
+    AGC_ENABLED: true
+    LOUDNESS_ENABLED: true
+    VAD_ENABLED: true
+  none_hpf_lpf:
+    HPF_ENABLED: true
+    LPF_ENABLED: true
+  none_hpf_lpf_vad:
+    HPF_ENABLED: true
+    LPF_ENABLED: true
+    VAD_ENABLED: true
+  none_hpf_lpf_loudness:
+    HPF_ENABLED: true
+    LPF_ENABLED: true
+    LOUDNESS_ENABLED: true
+  none_hpf_lpf_loudness_vad:
+    HPF_ENABLED: true
+    LPF_ENABLED: true
+    LOUDNESS_ENABLED: true
+    VAD_ENABLED: true
+  none_hpf_lpf_agc:
+    HPF_ENABLED: true
+    LPF_ENABLED: true
+    AGC_ENABLED: true
+  none_hpf_lpf_agc_vad:
+    HPF_ENABLED: true
+    LPF_ENABLED: true
+    AGC_ENABLED: true
+    VAD_ENABLED: true
+  none_hpf_lpf_agc_loudness:
+    HPF_ENABLED: true
+    LPF_ENABLED: true
+    AGC_ENABLED: true
+    LOUDNESS_ENABLED: true
+  none_hpf_lpf_agc_loudness_vad:
+    HPF_ENABLED: true
+    LPF_ENABLED: true
+    AGC_ENABLED: true
+    LOUDNESS_ENABLED: true
+    VAD_ENABLED: true
