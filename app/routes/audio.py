@@ -8,6 +8,7 @@ from werkzeug.utils import secure_filename
 
 from app.services import transcribe
 from app.services.audio_processor import preprocess_audio
+from app.services.transcript_postprocess import edit_transcript_from_config, save_postprocess_diff_file
 
 audio_bp = Blueprint("audio", __name__, url_prefix="/api/v1/audio")
 
@@ -55,7 +56,10 @@ def _run_transcription(audio_path: Path, *, file_id: str, preprocessing: str) ->
     except Exception as exc:
         return {"error": f"Transcription failed: {exc}"}, 500
 
-    response = {
+    raw_text = str(transcription.get("text", ""))
+    postprocess_enabled = bool(current_app.config.get("TRANSCRIPT_POSTPROCESS_ENABLED"))
+
+    response: dict = {
         "file_id": file_id,
         "source_audio": str(audio_path),
         "preprocessing": preprocessing,
@@ -63,6 +67,21 @@ def _run_transcription(audio_path: Path, *, file_id: str, preprocessing: str) ->
         "source": "faster-whisper",
         "experimental": True,
     }
+
+    if postprocess_enabled:
+        transcription["raw_text"] = raw_text
+        postprocess_result = edit_transcript_from_config(raw_text, current_app.config)
+        response["postprocess"] = {
+            "enabled": True,
+            "provider": postprocess_result["provider"],
+            "model": postprocess_result["model"],
+            "skipped": postprocess_result["skipped"],
+            "error": postprocess_result["error"],
+        }
+        if diff := postprocess_result.get("diff"):
+            response["postprocess"]["diff"] = diff
+        if not postprocess_result["skipped"]:
+            transcription["text"] = postprocess_result["text"]
 
     if isinstance(transcription.get("run"), dict):
         response["whisper"] = transcription["run"]
@@ -75,6 +94,28 @@ def _save_transcript(response: dict, *, label: str) -> None:
     processed_folder.mkdir(parents=True, exist_ok=True)
     transcript_path = processed_folder / f"{label}.json"
     transcript_path.write_text(json.dumps(response, ensure_ascii=False, indent=2), encoding="utf-8")
+
+    postprocess = response.get("postprocess", {})
+    transcription = response.get("transcription", {})
+    if (
+        postprocess
+        and not postprocess.get("skipped")
+        and isinstance(transcription, dict)
+        and transcription.get("raw_text")
+        and transcription.get("text")
+    ):
+        save_postprocess_diff_file(
+            processed_folder / f"{label}.postprocess.diff.txt",
+            raw_text=str(transcription["raw_text"]),
+            corrected_text=str(transcription["text"]),
+            diff=postprocess.get("diff"),
+            meta={
+                "file_id": response.get("file_id", label),
+                "provider": postprocess.get("provider"),
+                "model": postprocess.get("model"),
+            },
+            label=label,
+        )
 
 
 @audio_bp.post("/upload")

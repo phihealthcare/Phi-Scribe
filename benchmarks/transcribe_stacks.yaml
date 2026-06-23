@@ -1,0 +1,18 @@
+audio: public/anamnesia-4.mp3
+
+reference: benchmarks/references/anamnesia-4.txt
+
+whisper:
+  model: large-v3
+  device: cuda
+  compute_type: int8_float16
+  language: pt
+  beam_size: 5
+  initial_prompt: "Transcrição literal de anamnese em português brasileiro. Diálogo entre médica interna e paciente. Preservar a fala original."
+  compression_ratio_threshold: 1.8
+  log_prob_threshold: -0.8
+  hallucination_silence_threshold: 1.0
+  condition_on_previous_text: false
+  vad_filter: false
+
+stacks_source: benchmarks/stacks_all_generated.yaml

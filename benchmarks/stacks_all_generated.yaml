@@ -1,156 +1,233 @@
-audio: public/anamnesia-4.mp3
-reference: benchmarks/references/anamnesia-4.txt
+audio: public/anamnesia-1.mp3
+reference: benchmarks/references/anamnesia-1.txt
 whisper:
   model: large-v3
   device: cuda
-  compute_type: float16
+  compute_type: int8_float16
   language: pt
-  beam_size: 8
-  initial_prompt: pt-BR medical anamnesis transcription.
-  compression_ratio_threshold: 2.0
-  log_prob_threshold: -1.0
-  hallucination_silence_threshold: 1.5
+  beam_size: 5
+  initial_prompt: Transcrição literal de anamnese em português brasileiro. Diálogo
+    entre médica interna e paciente. Preservar a fala original.
+  compression_ratio_threshold: 1.8
+  log_prob_threshold: -0.8
+  hallucination_silence_threshold: 1.0
   condition_on_previous_text: false
   vad_filter: false
 stacks:
   baseline: {}
   spectral:
     DENOISE_ENABLED: true
+    DENOISE_PROP_DECREASE: 0.6
   spectral_vad:
     DENOISE_ENABLED: true
     VAD_ENABLED: true
+    ENHANCE_VOICE_ENABLED: false
+    ENHANCE_DEEP_ENABLED: false
   spectral_loudness:
     DENOISE_ENABLED: true
     LOUDNESS_ENABLED: true
+    ENHANCE_VOICE_ENABLED: false
+    ENHANCE_DEEP_ENABLED: false
   spectral_loudness_vad:
     DENOISE_ENABLED: true
     LOUDNESS_ENABLED: true
     VAD_ENABLED: true
+    ENHANCE_VOICE_ENABLED: false
+    ENHANCE_DEEP_ENABLED: false
   spectral_agc:
     DENOISE_ENABLED: true
     AGC_ENABLED: true
+    ENHANCE_VOICE_ENABLED: false
+    ENHANCE_DEEP_ENABLED: false
   spectral_agc_vad:
     DENOISE_ENABLED: true
     AGC_ENABLED: true
     VAD_ENABLED: true
+    ENHANCE_VOICE_ENABLED: false
+    ENHANCE_DEEP_ENABLED: false
   spectral_agc_loudness:
     DENOISE_ENABLED: true
     AGC_ENABLED: true
     LOUDNESS_ENABLED: true
+    ENHANCE_VOICE_ENABLED: false
+    ENHANCE_DEEP_ENABLED: false
   spectral_agc_loudness_vad:
     DENOISE_ENABLED: true
     AGC_ENABLED: true
     LOUDNESS_ENABLED: true
     VAD_ENABLED: true
+    ENHANCE_VOICE_ENABLED: false
+    ENHANCE_DEEP_ENABLED: false
   spectral_lpf:
     DENOISE_ENABLED: true
     LPF_ENABLED: true
+    ENHANCE_VOICE_ENABLED: false
+    ENHANCE_DEEP_ENABLED: false
   spectral_lpf_vad:
     DENOISE_ENABLED: true
     LPF_ENABLED: true
     VAD_ENABLED: true
+    ENHANCE_VOICE_ENABLED: false
+    ENHANCE_DEEP_ENABLED: false
   spectral_lpf_loudness:
     DENOISE_ENABLED: true
     LPF_ENABLED: true
     LOUDNESS_ENABLED: true
+    ENHANCE_VOICE_ENABLED: false
+    ENHANCE_DEEP_ENABLED: false
   spectral_lpf_loudness_vad:
     DENOISE_ENABLED: true
     LPF_ENABLED: true
     LOUDNESS_ENABLED: true
     VAD_ENABLED: true
+    ENHANCE_VOICE_ENABLED: false
+    ENHANCE_DEEP_ENABLED: false
   spectral_lpf_agc:
     DENOISE_ENABLED: true
     LPF_ENABLED: true
     AGC_ENABLED: true
+    ENHANCE_VOICE_ENABLED: false
+    ENHANCE_DEEP_ENABLED: false
   spectral_lpf_agc_vad:
     DENOISE_ENABLED: true
     LPF_ENABLED: true
     AGC_ENABLED: true
     VAD_ENABLED: true
+    ENHANCE_VOICE_ENABLED: false
+    ENHANCE_DEEP_ENABLED: false
   spectral_lpf_agc_loudness:
     DENOISE_ENABLED: true
     LPF_ENABLED: true
     AGC_ENABLED: true
     LOUDNESS_ENABLED: true
+    ENHANCE_VOICE_ENABLED: false
+    ENHANCE_DEEP_ENABLED: false
   spectral_lpf_agc_loudness_vad:
     DENOISE_ENABLED: true
     LPF_ENABLED: true
     AGC_ENABLED: true
     LOUDNESS_ENABLED: true
     VAD_ENABLED: true
+    ENHANCE_VOICE_ENABLED: false
+    ENHANCE_DEEP_ENABLED: false
   spectral_hpf:
     DENOISE_ENABLED: true
     HPF_ENABLED: true
+    ENHANCE_VOICE_ENABLED: false
+    ENHANCE_DEEP_ENABLED: false
   spectral_hpf_vad:
     DENOISE_ENABLED: true
     HPF_ENABLED: true
     VAD_ENABLED: true
+    ENHANCE_VOICE_ENABLED: false
+    ENHANCE_DEEP_ENABLED: false
   spectral_hpf_loudness:
     DENOISE_ENABLED: true
     HPF_ENABLED: true
     LOUDNESS_ENABLED: true
+    ENHANCE_VOICE_ENABLED: false
+    ENHANCE_DEEP_ENABLED: false
   spectral_hpf_loudness_vad:
     DENOISE_ENABLED: true
     HPF_ENABLED: true
     LOUDNESS_ENABLED: true
     VAD_ENABLED: true
+    ENHANCE_VOICE_ENABLED: false
+    ENHANCE_DEEP_ENABLED: false
   spectral_hpf_agc:
     DENOISE_ENABLED: true
+    DENOISE_PROP_DECREASE: 0.6
     HPF_ENABLED: true
     AGC_ENABLED: true
+    LPF_ENABLED: false
+    LOUDNESS_ENABLED: false
+    VAD_ENABLED: false
   spectral_hpf_agc_vad:
     DENOISE_ENABLED: true
     HPF_ENABLED: true
     AGC_ENABLED: true
     VAD_ENABLED: true
+    ENHANCE_VOICE_ENABLED: false
+    ENHANCE_DEEP_ENABLED: false
   spectral_hpf_agc_loudness:
     DENOISE_ENABLED: true
+    DENOISE_PROP_DECREASE: 0.6
     HPF_ENABLED: true
     AGC_ENABLED: true
     LOUDNESS_ENABLED: true
+    VAD_ENABLED: false
+    LPF_ENABLED: false
   spectral_hpf_agc_loudness_vad:
     DENOISE_ENABLED: true
+    DENOISE_PROP_DECREASE: 0.6
     HPF_ENABLED: true
+    HPF_CUTOFF_HZ: 80.0
     AGC_ENABLED: true
+    AGC_TARGET_DBFS: -20.0
+    AGC_MAX_GAIN_DB: 12.0
+    AGC_WINDOW_MS: 30
     LOUDNESS_ENABLED: true
+    LOUDNESS_MODE: lufs
+    LOUDNESS_TARGET_LUFS: -23.0
+    LOUDNESS_TRUE_PEAK: -1.5
+    LOUDNESS_LRA: 11.0
     VAD_ENABLED: true
+    VAD_THRESHOLD: 0.35
+    VAD_MIN_SPEECH_DURATION_MS: 100
+    VAD_MIN_SILENCE_DURATION_MS: 2500
+    VAD_SPEECH_PAD_MS: 600
+    LPF_ENABLED: false
   spectral_hpf_lpf:
     DENOISE_ENABLED: true
     HPF_ENABLED: true
     LPF_ENABLED: true
+    ENHANCE_VOICE_ENABLED: false
+    ENHANCE_DEEP_ENABLED: false
   spectral_hpf_lpf_vad:
     DENOISE_ENABLED: true
     HPF_ENABLED: true
     LPF_ENABLED: true
     VAD_ENABLED: true
+    ENHANCE_VOICE_ENABLED: false
+    ENHANCE_DEEP_ENABLED: false
   spectral_hpf_lpf_loudness:
     DENOISE_ENABLED: true
     HPF_ENABLED: true
     LPF_ENABLED: true
     LOUDNESS_ENABLED: true
+    ENHANCE_VOICE_ENABLED: false
+    ENHANCE_DEEP_ENABLED: false
   spectral_hpf_lpf_loudness_vad:
     DENOISE_ENABLED: true
     HPF_ENABLED: true
     LPF_ENABLED: true
     LOUDNESS_ENABLED: true
     VAD_ENABLED: true
+    ENHANCE_VOICE_ENABLED: false
+    ENHANCE_DEEP_ENABLED: false
   spectral_hpf_lpf_agc:
     DENOISE_ENABLED: true
     HPF_ENABLED: true
     LPF_ENABLED: true
     AGC_ENABLED: true
+    ENHANCE_VOICE_ENABLED: false
+    ENHANCE_DEEP_ENABLED: false
   spectral_hpf_lpf_agc_vad:
     DENOISE_ENABLED: true
     HPF_ENABLED: true
     LPF_ENABLED: true
     AGC_ENABLED: true
     VAD_ENABLED: true
+    ENHANCE_VOICE_ENABLED: false
+    ENHANCE_DEEP_ENABLED: false
   spectral_hpf_lpf_agc_loudness:
     DENOISE_ENABLED: true
     HPF_ENABLED: true
     LPF_ENABLED: true
     AGC_ENABLED: true
     LOUDNESS_ENABLED: true
+    ENHANCE_VOICE_ENABLED: false
+    ENHANCE_DEEP_ENABLED: false
   spectral_hpf_lpf_agc_loudness_vad:
     DENOISE_ENABLED: true
     HPF_ENABLED: true
@@ -158,114 +235,218 @@ stacks:
     AGC_ENABLED: true
     LOUDNESS_ENABLED: true
     VAD_ENABLED: true
+    ENHANCE_VOICE_ENABLED: false
+    ENHANCE_DEEP_ENABLED: false
   none_vad:
     VAD_ENABLED: true
+    ENHANCE_VOICE_ENABLED: false
+    ENHANCE_DEEP_ENABLED: false
   none_loudness:
     LOUDNESS_ENABLED: true
+    ENHANCE_VOICE_ENABLED: false
+    ENHANCE_DEEP_ENABLED: false
   none_loudness_vad:
     LOUDNESS_ENABLED: true
     VAD_ENABLED: true
+    ENHANCE_VOICE_ENABLED: false
+    ENHANCE_DEEP_ENABLED: false
   none_agc:
     AGC_ENABLED: true
+    ENHANCE_VOICE_ENABLED: false
+    ENHANCE_DEEP_ENABLED: false
   none_agc_vad:
     AGC_ENABLED: true
     VAD_ENABLED: true
+    ENHANCE_VOICE_ENABLED: false
+    ENHANCE_DEEP_ENABLED: false
   none_agc_loudness:
     AGC_ENABLED: true
     LOUDNESS_ENABLED: true
+    ENHANCE_VOICE_ENABLED: false
+    ENHANCE_DEEP_ENABLED: false
   none_agc_loudness_vad:
     AGC_ENABLED: true
     LOUDNESS_ENABLED: true
     VAD_ENABLED: true
+    ENHANCE_VOICE_ENABLED: false
+    ENHANCE_DEEP_ENABLED: false
   none_lpf:
     LPF_ENABLED: true
+    ENHANCE_VOICE_ENABLED: false
+    ENHANCE_DEEP_ENABLED: false
   none_lpf_vad:
     LPF_ENABLED: true
     VAD_ENABLED: true
+    ENHANCE_VOICE_ENABLED: false
+    ENHANCE_DEEP_ENABLED: false
   none_lpf_loudness:
     LPF_ENABLED: true
     LOUDNESS_ENABLED: true
+    ENHANCE_VOICE_ENABLED: false
+    ENHANCE_DEEP_ENABLED: false
   none_lpf_loudness_vad:
     LPF_ENABLED: true
     LOUDNESS_ENABLED: true
     VAD_ENABLED: true
+    ENHANCE_VOICE_ENABLED: false
+    ENHANCE_DEEP_ENABLED: false
   none_lpf_agc:
     LPF_ENABLED: true
     AGC_ENABLED: true
+    ENHANCE_VOICE_ENABLED: false
+    ENHANCE_DEEP_ENABLED: false
   none_lpf_agc_vad:
     LPF_ENABLED: true
     AGC_ENABLED: true
     VAD_ENABLED: true
+    ENHANCE_VOICE_ENABLED: false
+    ENHANCE_DEEP_ENABLED: false
   none_lpf_agc_loudness:
     LPF_ENABLED: true
     AGC_ENABLED: true
     LOUDNESS_ENABLED: true
+    ENHANCE_VOICE_ENABLED: false
+    ENHANCE_DEEP_ENABLED: false
   none_lpf_agc_loudness_vad:
     LPF_ENABLED: true
     AGC_ENABLED: true
     LOUDNESS_ENABLED: true
     VAD_ENABLED: true
+    ENHANCE_VOICE_ENABLED: false
+    ENHANCE_DEEP_ENABLED: false
   none_hpf:
     HPF_ENABLED: true
+    ENHANCE_VOICE_ENABLED: false
+    ENHANCE_DEEP_ENABLED: false
   none_hpf_vad:
     HPF_ENABLED: true
     VAD_ENABLED: true
+    ENHANCE_VOICE_ENABLED: false
+    ENHANCE_DEEP_ENABLED: false
   none_hpf_loudness:
     HPF_ENABLED: true
     LOUDNESS_ENABLED: true
+    ENHANCE_VOICE_ENABLED: false
+    ENHANCE_DEEP_ENABLED: false
   none_hpf_loudness_vad:
     HPF_ENABLED: true
     LOUDNESS_ENABLED: true
     VAD_ENABLED: true
+    ENHANCE_VOICE_ENABLED: false
+    ENHANCE_DEEP_ENABLED: false
   none_hpf_agc:
     HPF_ENABLED: true
     AGC_ENABLED: true
+    ENHANCE_VOICE_ENABLED: false
+    ENHANCE_DEEP_ENABLED: false
   none_hpf_agc_vad:
     HPF_ENABLED: true
     AGC_ENABLED: true
     VAD_ENABLED: true
+    ENHANCE_VOICE_ENABLED: false
+    ENHANCE_DEEP_ENABLED: false
   none_hpf_agc_loudness:
     HPF_ENABLED: true
     AGC_ENABLED: true
     LOUDNESS_ENABLED: true
+    ENHANCE_VOICE_ENABLED: false
+    ENHANCE_DEEP_ENABLED: false
   none_hpf_agc_loudness_vad:
     HPF_ENABLED: true
     AGC_ENABLED: true
     LOUDNESS_ENABLED: true
     VAD_ENABLED: true
+    ENHANCE_VOICE_ENABLED: false
+    ENHANCE_DEEP_ENABLED: false
   none_hpf_lpf:
     HPF_ENABLED: true
     LPF_ENABLED: true
+    ENHANCE_VOICE_ENABLED: false
+    ENHANCE_DEEP_ENABLED: false
   none_hpf_lpf_vad:
     HPF_ENABLED: true
     LPF_ENABLED: true
     VAD_ENABLED: true
+    ENHANCE_VOICE_ENABLED: false
+    ENHANCE_DEEP_ENABLED: false
   none_hpf_lpf_loudness:
     HPF_ENABLED: true
     LPF_ENABLED: true
     LOUDNESS_ENABLED: true
+    ENHANCE_VOICE_ENABLED: false
+    ENHANCE_DEEP_ENABLED: false
   none_hpf_lpf_loudness_vad:
     HPF_ENABLED: true
     LPF_ENABLED: true
     LOUDNESS_ENABLED: true
     VAD_ENABLED: true
+    ENHANCE_VOICE_ENABLED: false
+    ENHANCE_DEEP_ENABLED: false
   none_hpf_lpf_agc:
     HPF_ENABLED: true
     LPF_ENABLED: true
     AGC_ENABLED: true
+    ENHANCE_VOICE_ENABLED: false
+    ENHANCE_DEEP_ENABLED: false
   none_hpf_lpf_agc_vad:
     HPF_ENABLED: true
     LPF_ENABLED: true
     AGC_ENABLED: true
     VAD_ENABLED: true
+    ENHANCE_VOICE_ENABLED: false
+    ENHANCE_DEEP_ENABLED: false
   none_hpf_lpf_agc_loudness:
     HPF_ENABLED: true
     LPF_ENABLED: true
     AGC_ENABLED: true
     LOUDNESS_ENABLED: true
+    ENHANCE_VOICE_ENABLED: false
+    ENHANCE_DEEP_ENABLED: false
   none_hpf_lpf_agc_loudness_vad:
     HPF_ENABLED: true
     LPF_ENABLED: true
     AGC_ENABLED: true
     LOUDNESS_ENABLED: true
     VAD_ENABLED: true
+    ENHANCE_VOICE_ENABLED: false
+    ENHANCE_DEEP_ENABLED: false
+  hpf_only:
+    HPF_ENABLED: true
+  vad_only:
+    VAD_ENABLED: true
+  spectral_hpf_agc_vad_conservative:
+    DENOISE_ENABLED: true
+    DENOISE_PROP_DECREASE: 0.6
+    HPF_ENABLED: true
+    AGC_ENABLED: true
+    VAD_ENABLED: true
+    VAD_THRESHOLD: 0.35
+    VAD_MIN_SPEECH_DURATION_MS: 100
+    VAD_MIN_SILENCE_DURATION_MS: 2500
+    VAD_SPEECH_PAD_MS: 600
+    LPF_ENABLED: false
+    LOUDNESS_ENABLED: false
+  spectral_light_hpf_agc_loudness_vad:
+    DENOISE_ENABLED: true
+    DENOISE_PROP_DECREASE: 0.3
+    HPF_ENABLED: true
+    AGC_ENABLED: true
+    LOUDNESS_ENABLED: true
+    VAD_ENABLED: true
+    LPF_ENABLED: false
+  test_improve_describe:
+    DENOISE_ENABLED: true
+    DENOISE_PROP_DECREASE: 0.6
+    HPF_ENABLED: true
+    HPF_CUTOFF_HZ: 80.0
+    AGC_ENABLED: true
+    AGC_TARGET_DBFS: -20.0
+    AGC_MAX_GAIN_DB: 12.0
+    AGC_WINDOW_MS: 30
+    LPF_ENABLED: false
+    LOUDNESS_ENABLED: false
+    VAD_ENABLED: false
+postprocess:
+  enabled: true
+  model: gpt-4o
+  prompt_path: benchmarks/prompts/medical-transcript-editor.md

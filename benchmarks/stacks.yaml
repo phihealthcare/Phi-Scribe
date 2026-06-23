@@ -1,15 +1,20 @@
 audio: public/anamnesia-4.mp3
 reference: benchmarks/references/anamnesia-4.txt
 
+postprocess:
+  enabled: true
+  model: gpt-4o
+  prompt_path: benchmarks/prompts/medical-transcript-editor.md
+
 whisper:
   model: large-v3
   device: cuda
-  compute_type: float16
+  compute_type: int8_float16
   language: pt
-  beam_size: 8
-  initial_prompt: "Transcrição literal de consulta médica em português brasileiro. Diálogo entre médico e paciente. Preservar a fala original, incluindo expressões informais e comparações do paciente."
+  beam_size: 5
+  initial_prompt: "Transcrição literal de anamnese em português brasileiro. Diálogo entre médica interna e paciente. Preservar a fala original."
   compression_ratio_threshold: 1.8
-  log_prob_threshold: -1.0
+  log_prob_threshold: -0.8
   hallucination_silence_threshold: 1.0
   condition_on_previous_text: false
   vad_filter: false
@@ -37,79 +42,96 @@ stacks:
     #VAD_MIN_SILENCE_DURATION_MS:2500
     #VAD_SPEECH_PAD_MS:600
 
-  rnnoise:
-    ENHANCE_VOICE_ENABLED: true
-
-  deepfilter_isolated:
-    ENHANCE_DEEP_ENABLED: true
-    ENHANCE_DEEP_DEVICE: cuda
-    HPF_ENABLED: true
-
-  deepfilter_post_filter:
-    ENHANCE_DEEP_ENABLED: true
-    ENHANCE_DEEP_DEVICE: cuda
-    HPF_ENABLED: true
-    ENHANCE_DEEP_POST_FILTER: true
-
-  deepfilter_atten_12:
-    ENHANCE_DEEP_ENABLED: true
-    ENHANCE_DEEP_DEVICE: cuda
-    HPF_ENABLED: true
-    ENHANCE_DEEP_ATTEN_LIM_DB: 12
-
-  deepfilter_loudness:
-    ENHANCE_DEEP_ENABLED: true
-    ENHANCE_DEEP_DEVICE: cuda
-    HPF_ENABLED: true
-    LOUDNESS_ENABLED: true
-
-  deepfilter_agc:
-    ENHANCE_DEEP_ENABLED: true
-    ENHANCE_DEEP_DEVICE: cuda
-    HPF_ENABLED: true
-    AGC_ENABLED: true
-
-  deepfilter_full:
-    ENHANCE_DEEP_ENABLED: true
-    ENHANCE_DEEP_DEVICE: cuda
-    HPF_ENABLED: true
-    LPF_ENABLED: true
-    AGC_ENABLED: true
-    LOUDNESS_ENABLED: true
-
-  vad_trim:
-    ENHANCE_DEEP_ENABLED: true
-    ENHANCE_DEEP_DEVICE: cuda
-    HPF_ENABLED: true
-    LPF_ENABLED: true
-    AGC_ENABLED: true
-    LOUDNESS_ENABLED: true
-    VAD_ENABLED: true
-
-  deepfilter_only:
-    ENHANCE_DEEP_ENABLED: true
-    ENHANCE_DEEP_MODEL: DeepFilterNet3
-    ENHANCE_DEEP_DEVICE: cuda   # or cpu
-    ENHANCE_DEEP_POST_FILTER: false
-    ENHANCE_DEEP_ATTEN_LIM_DB: null
-    HPF_ENABLED: false
-    LPF_ENABLED: false
-    AGC_ENABLED: false
-    LOUDNESS_ENABLED: false
-    VAD_ENABLED: false
+  # --- Enhance stacks disabled for WER benchmark (RNNoise / DeepFilterNet) ---
+  # Re-enable to compare; code unchanged in app/services/enhance_deep.py etc.
+  #
+  # rnnoise:
+  #   ENHANCE_VOICE_ENABLED: true
+  #
+  # deepfilter_isolated:
+  #   ENHANCE_DEEP_ENABLED: true
+  #   ENHANCE_DEEP_DEVICE: cuda
+  #   HPF_ENABLED: true
+  #
+  # deepfilter_post_filter:
+  #   ENHANCE_DEEP_ENABLED: true
+  #   ENHANCE_DEEP_DEVICE: cuda
+  #   HPF_ENABLED: true
+  #   ENHANCE_DEEP_POST_FILTER: true
+  #
+  # deepfilter_atten_12:
+  #   ENHANCE_DEEP_ENABLED: true
+  #   ENHANCE_DEEP_DEVICE: cuda
+  #   HPF_ENABLED: true
+  #   ENHANCE_DEEP_ATTEN_LIM_DB: 12
+  #
+  # deepfilter_loudness:
+  #   ENHANCE_DEEP_ENABLED: true
+  #   ENHANCE_DEEP_DEVICE: cuda
+  #   HPF_ENABLED: true
+  #   LOUDNESS_ENABLED: true
+  #
+  # deepfilter_agc:
+  #   ENHANCE_DEEP_ENABLED: true
+  #   ENHANCE_DEEP_DEVICE: cuda
+  #   HPF_ENABLED: true
+  #   AGC_ENABLED: true
+  #
+  # deepfilter_full:
+  #   ENHANCE_DEEP_ENABLED: true
+  #   ENHANCE_DEEP_DEVICE: cuda
+  #   HPF_ENABLED: true
+  #   LPF_ENABLED: true
+  #   AGC_ENABLED: true
+  #   LOUDNESS_ENABLED: true
+  #
+  # vad_trim:
+  #   ENHANCE_DEEP_ENABLED: true
+  #   ENHANCE_DEEP_DEVICE: cuda
+  #   HPF_ENABLED: true
+  #   LPF_ENABLED: true
+  #   AGC_ENABLED: true
+  #   LOUDNESS_ENABLED: true
+  #   VAD_ENABLED: true
+  #
+  # deepfilter_only:
+  #   ENHANCE_DEEP_ENABLED: true
+  #   ENHANCE_DEEP_MODEL: DeepFilterNet3
+  #   ENHANCE_DEEP_DEVICE: cuda
+  #   ENHANCE_DEEP_POST_FILTER: false
+  #   ENHANCE_DEEP_ATTEN_LIM_DB: null
+  #   HPF_ENABLED: false
+  #   LPF_ENABLED: false
+  #   AGC_ENABLED: false
+  #   LOUDNESS_ENABLED: false
+  #   VAD_ENABLED: false
 
   vad_only:
     VAD_ENABLED: true
 
+  # Best WER (14.46%) on anamnesia-4 transcribe benchmark with VAD + loudness.
+  # Pipeline: normalize → remove_hum → denoise → agc → loudness → vad
   spectral_hpf_agc_loudness_vad:
     DENOISE_ENABLED: true
     DENOISE_PROP_DECREASE: 0.6
     HPF_ENABLED: true
+    HPF_CUTOFF_HZ: 80.0
     AGC_ENABLED: true
+    AGC_TARGET_DBFS: -20.0
+    AGC_MAX_GAIN_DB: 12.0
+    AGC_WINDOW_MS: 30
     LOUDNESS_ENABLED: true
+    LOUDNESS_MODE: lufs
+    LOUDNESS_TARGET_LUFS: -23.0
+    LOUDNESS_TRUE_PEAK: -1.5
+    LOUDNESS_LRA: 11.0
     VAD_ENABLED: true
+    VAD_THRESHOLD: 0.35
+    VAD_MIN_SPEECH_DURATION_MS: 100
+    VAD_MIN_SILENCE_DURATION_MS: 2500
+    VAD_SPEECH_PAD_MS: 600
     LPF_ENABLED: false
-  
+
   spectral_hpf_agc_loudness:
     DENOISE_ENABLED: true
     DENOISE_PROP_DECREASE: 0.6
@@ -140,3 +162,16 @@ stacks:
     LOUDNESS_ENABLED: true
     VAD_ENABLED: true
     LPF_ENABLED: false
+
+  test_improve_describe:
+    DENOISE_ENABLED: true
+    DENOISE_PROP_DECREASE: 0.6
+    HPF_ENABLED: true
+    HPF_CUTOFF_HZ: 80.0
+    AGC_ENABLED: true
+    AGC_TARGET_DBFS: -20.0
+    AGC_MAX_GAIN_DB: 12.0
+    AGC_WINDOW_MS: 30
+    LPF_ENABLED: false
+    LOUDNESS_ENABLED: false
+    VAD_ENABLED: false

@@ -93,7 +93,9 @@ class Config:
     WHISPER_FASTER_BEAM_SIZE = int(os.environ.get("WHISPER_FASTER_BEAM_SIZE", 5))
     WHISPER_FASTER_INITIAL_PROMPT = os.environ.get(
         "WHISPER_FASTER_INITIAL_PROMPT",
-        "Transcrição de consulta médica em português brasileiro.",
+        "Transcrição literal de consulta médica em português brasileiro. "
+        "Diálogo entre profissional de saúde e paciente. "
+        "Preservar a fala original, incluindo expressões informais.",
     )
     WHISPER_FASTER_VAD_FILTER = os.environ.get("WHISPER_FASTER_VAD_FILTER", "false").lower() in {
         "true",
@@ -116,6 +118,17 @@ class Config:
         "WHISPER_FASTER_CONDITION_ON_PREVIOUS_TEXT",
         "true",
     ).lower() in {"true", "1", "yes"}
+    TRANSCRIPT_POSTPROCESS_ENABLED = os.environ.get(
+        "TRANSCRIPT_POSTPROCESS_ENABLED",
+        "false",
+    ).lower() in {"true", "1", "yes"}
+    TRANSCRIPT_POSTPROCESS_PROVIDER = os.environ.get("TRANSCRIPT_POSTPROCESS_PROVIDER", "openai")
+    TRANSCRIPT_POSTPROCESS_MODEL = os.environ.get("TRANSCRIPT_POSTPROCESS_MODEL", "gpt-4o")
+    TRANSCRIPT_POSTPROCESS_PROMPT_PATH = os.environ.get(
+        "TRANSCRIPT_POSTPROCESS_PROMPT_PATH",
+        "benchmarks/prompts/medical-transcript-editor.md",
+    )
+    OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY", "").strip() or None
 
 
 class DevelopmentConfig(Config):

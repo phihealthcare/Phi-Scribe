@@ -12,6 +12,14 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
+from benchmarks.score_transcribe import is_allowed_stack
+
+# Spectral matrix only — never sweep RNNoise or DeepFilterNet in generated stacks.
+ENHANCE_EXCLUDE_OVERRIDES: dict[str, bool] = {
+    "ENHANCE_VOICE_ENABLED": False,
+    "ENHANCE_DEEP_ENABLED": False,
+}
+
 
 def _stack_id(
     *,
@@ -83,6 +91,7 @@ def _build_overrides(
     if vad_enabled:
         overrides["VAD_ENABLED"] = True
 
+    overrides.update(ENHANCE_EXCLUDE_OVERRIDES)
     return overrides
 
 
@@ -95,6 +104,7 @@ def main() -> None:
     audio = base_cfg["audio"]
     reference = base_cfg["reference"]
     whisper_cfg = base_cfg["whisper"]
+    postprocess_cfg = base_cfg.get("postprocess")
 
     denoisers = ["denoise", "none"]
 
@@ -142,15 +152,28 @@ def main() -> None:
         stacks[stack_id] = overrides
         generated_ids.append(stack_id)
 
+    skipped_enhance: list[str] = []
+    for stack_id, overrides in (base_cfg.get("stacks") or {}).items():
+        if stack_id == "baseline":
+            continue
+        if not isinstance(overrides, dict):
+            continue
+        if not is_allowed_stack(overrides):
+            skipped_enhance.append(stack_id)
+            continue
+        stacks[stack_id] = overrides
+
     if len(set(stacks.keys())) != len(stacks.keys()):
         raise RuntimeError("Duplicate stack IDs detected.")
 
-    out_payload = {
+    out_payload: dict[str, Any] = {
         "audio": audio,
         "reference": reference,
         "whisper": whisper_cfg,
         "stacks": stacks,
     }
+    if postprocess_cfg:
+        out_payload["postprocess"] = postprocess_cfg
 
     out_path.write_text(
         yaml.safe_dump(out_payload, sort_keys=False, allow_unicode=True),
@@ -161,6 +184,11 @@ def main() -> None:
     examples = sorted(set(generated_ids))[:3]
     print(f"Wrote: {out_path}")
     print(f"Total stacks (including baseline): {generated_total}")
+    if skipped_enhance:
+        print(
+            f"Skipped {len(skipped_enhance)} enhance stack(s) from stacks.yaml: "
+            f"{', '.join(skipped_enhance)}"
+        )
     if examples:
         print("Example stack IDs:")
         for ex in examples:

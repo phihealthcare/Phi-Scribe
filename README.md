@@ -306,8 +306,25 @@ Upload metadata includes `requested_device`, resolved `device`, `model_device`, 
 | `WHISPER_FASTER_CONDITION_ON_PREVIOUS_TEXT`      | `true`        | Use prior segment as context (`false` can reduce repetition on long files) |
 | `WHISPER_FASTER_VAD_FILTER`                      | `false`       | faster-whisper internal VAD (separate from upload `VAD_ENABLED`)           |
 
+**LLM transcript post-edit** (optional, after Whisper — `.env`):
 
-### Main endpoints
+| Variable                           | Default                                         | Description                                                                 |
+| ---------------------------------- | ----------------------------------------------- | --------------------------------------------------------------------------- |
+| `TRANSCRIPT_POSTPROCESS_ENABLED`   | `false`                                         | Run LLM editor on Whisper output before returning `transcription.text`      |
+| `TRANSCRIPT_POSTPROCESS_PROVIDER`  | `openai`                                        | Provider (`openai` only for now)                                            |
+| `OPENAI_API_KEY`                   | (unset)                                         | API key; post-edit is skipped if missing                                    |
+| `TRANSCRIPT_POSTPROCESS_MODEL`     | `gpt-4o-mini`                                   | Chat model for post-edit                                                    |
+| `TRANSCRIPT_POSTPROCESS_PROMPT_PATH` | `benchmarks/prompts/medical-transcript-editor.md` | System prompt file (specialty-agnostic pt-BR medical editor)              |
+
+When `TRANSCRIPT_POSTPROCESS_ENABLED=false`, transcribe responses are unchanged. When enabled, `transcription.text` is the corrected transcript and `transcription.raw_text` holds the raw Whisper output. On LLM failure, `transcription.text` stays raw and `postprocess.error` describes the failure.
+
+Pipeline:
+
+```
+upload (preprocess) → transcribe_wav (faster-whisper) → [optional] LLM editor → API response
+```
+
+Prompt: [benchmarks/prompts/medical-transcript-editor.md](benchmarks/prompts/medical-transcript-editor.md). Legacy gynecology-specific example: [benchmarks/prompts/fix-whisper-transcript.md](benchmarks/prompts/fix-whisper-transcript.md).
 
 ```
 POST /api/v1/audio/upload
@@ -384,6 +401,7 @@ app/
   services/agc.py              # dynamic gain (RMS AGC)
   services/loudness.py         # LUFS / peak loudness normalization
   services/transcribe.py       # experimental faster-whisper (decoupled)
+  services/transcript_postprocess.py  # optional LLM post-edit after Whisper
   services/vad.py              # Silero VAD trim
   config.py                    # environment variables
 uploads/                         # original audio
