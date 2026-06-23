@@ -1,7 +1,5 @@
 # Relatório de Benchmark — Stacks de Pré-processamento (phi-scribe)
 
-**Data da análise:** 22 Jun 2026  
-**Fonte:** último timestamp em cada pasta `benchmarks/results/anamnesia-`*  
 **Modelo ASR:** Whisper `large-v3` · CUDA · `int8_float16`  
 **Stacks testados:** 69 (`stacks_all_generated.yaml`)
 
