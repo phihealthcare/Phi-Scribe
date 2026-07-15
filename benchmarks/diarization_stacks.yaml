@@ -1,0 +1,36 @@
+audio: uploads/processed/2a01499f-f59d-4ddf-8569-4ed9b7921a29.wav
+reference: benchmarks/references/consulta-real-1-diarized.txt
+
+whisper:
+  model_size: small
+  device: cuda
+  compute_type: int8_float16
+  language: pt
+  beam_size: 5
+
+# Fixed across every stack (only chunk_s/overlap_s vary — see plan notes).
+sortformer_fixed:
+  model_id: nvidia/diar_sortformer_4spk-v1
+  device: cuda
+  max_duration_s: 300.0
+  min_turn_ms: 400
+
+stacks:
+  chunk_240_20:
+    chunk_s: 240.0
+    overlap_s: 20.0
+  chunk_180_20:
+    chunk_s: 180.0
+    overlap_s: 20.0
+  chunk_120_20:
+    chunk_s: 120.0
+    overlap_s: 20.0
+  chunk_90_20:
+    chunk_s: 90.0
+    overlap_s: 20.0
+  chunk_90_10:
+    chunk_s: 90.0
+    overlap_s: 10.0
+  chunk_60_15:
+    chunk_s: 60.0
+    overlap_s: 15.0

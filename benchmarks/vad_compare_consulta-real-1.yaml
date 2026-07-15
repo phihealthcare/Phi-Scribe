@@ -1,0 +1,59 @@
+# Compare upload Silero VAD vs faster-whisper vad_filter on consulta-real-1.
+audio: public/consulta-real-1.mp4
+reference: benchmarks/references/consulta-real-1.txt
+
+whisper:
+  model: large-v3
+  device: cuda
+  compute_type: int8_float16
+  language: pt
+  beam_size: 5
+  initial_prompt_file: benchmarks/prompts/whisper-initial-hotwords.txt
+  compression_ratio_threshold: 1.8
+  log_prob_threshold: -0.8
+  hallucination_silence_threshold: 1.0
+  condition_on_previous_text: false
+  inference_mode: sequential
+
+# Shared preprocess stack (spectral_hpf_agc_loudness); VAD toggled per variant.
+base_stack:
+  DENOISE_ENABLED: true
+  DENOISE_PROP_DECREASE: 0.6
+  HPF_ENABLED: true
+  HPF_CUTOFF_HZ: 80.0
+  AGC_ENABLED: true
+  AGC_TARGET_DBFS: -20.0
+  AGC_MAX_GAIN_DB: 12.0
+  AGC_WINDOW_MS: 30
+  LOUDNESS_ENABLED: true
+  LOUDNESS_MODE: lufs
+  LOUDNESS_TARGET_LUFS: -23.0
+  LOUDNESS_TRUE_PEAK: -1.5
+  LOUDNESS_LRA: 11.0
+  LPF_ENABLED: false
+
+variants:
+  silero_upload_vad:
+    description: "Production — upload Silero trim, Whisper vad_filter=false"
+    stack_overrides:
+      VAD_ENABLED: true
+      VAD_THRESHOLD: 0.35
+      VAD_MIN_SPEECH_DURATION_MS: 100
+      VAD_MIN_SILENCE_DURATION_MS: 2500
+      VAD_SPEECH_PAD_MS: 600
+    whisper_overrides:
+      vad_filter: false
+
+  whisper_vad_only:
+    description: "No upload VAD — Whisper vad_filter=true (time savings on upload)"
+    stack_overrides:
+      VAD_ENABLED: false
+    whisper_overrides:
+      vad_filter: true
+
+  no_vad:
+    description: "Control — neither upload nor Whisper VAD"
+    stack_overrides:
+      VAD_ENABLED: false
+    whisper_overrides:
+      vad_filter: false

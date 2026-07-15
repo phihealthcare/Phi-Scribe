@@ -1,0 +1,62 @@
+{
+  "_comment": "Synthetic fixture for tests: exercises extractSoapSections' fallback path (soap_draft.document is null/missing, but per-section partials in soap_draft.sections are all individually valid). Not a literal recording of a real backend response.",
+  "file_id": "fallback-0001",
+  "source_audio": "uploads/processed/fallback-0001.wav",
+  "preprocessing": "upload_pipeline",
+  "source": "faster-whisper",
+  "experimental": true,
+  "diarization_enabled": true,
+  "transcription": {
+    "text": "MÉDICO: Bom dia.\nPACIENTE: Bom dia, doutor.",
+    "segments": [
+      { "start_ms": 0, "end_ms": 1500, "speaker": "0", "speaker_label": "MÉDICO", "text": "Bom dia." },
+      { "start_ms": 1600, "end_ms": 3000, "speaker": "1", "speaker_label": "PACIENTE", "text": "Bom dia, doutor." }
+    ]
+  },
+  "soap_draft": {
+    "enabled": true,
+    "provider": "phihc",
+    "model": "gemma3:12b-it-qat",
+    "prompt_path": "benchmarks/prompts/soap-subjetivo.md",
+    "skipped": true,
+    "error": "invalid_soap_schema: merged document failed cross-section validation",
+    "diarization_enabled": true,
+    "postprocess_applied": true,
+    "document": null,
+    "validation_errors": ["merged document failed cross-section validation"],
+    "sections": {
+      "subjetivo": {
+        "section_id": "subjetivo",
+        "prompt_path": "benchmarks/prompts/soap-subjetivo.md",
+        "raw": "{\"subjetivo\":\"Refere dor leve.\",\"alertas_revisao\":[]}",
+        "partial": { "subjetivo": "Refere dor leve.", "alertas_revisao": [] },
+        "schema_coerced": false,
+        "validation_errors": null
+      },
+      "objetivo": {
+        "section_id": "objetivo",
+        "prompt_path": "benchmarks/prompts/soap-objetivo.md",
+        "raw": "{\"objetivo\":\"Sem dados objetivos suficientes na transcrição.\",\"alertas_revisao\":[]}",
+        "partial": { "objetivo": "Sem dados objetivos suficientes na transcrição.", "alertas_revisao": [] },
+        "schema_coerced": false,
+        "validation_errors": null
+      },
+      "avaliacao": {
+        "section_id": "avaliacao",
+        "prompt_path": "benchmarks/prompts/soap-avaliacao.md",
+        "raw": "{\"avaliacao\":\"Consulta de rotina.\",\"alertas_revisao\":[]}",
+        "partial": { "avaliacao": "Consulta de rotina.", "alertas_revisao": [] },
+        "schema_coerced": false,
+        "validation_errors": null
+      },
+      "plano": {
+        "section_id": "plano",
+        "prompt_path": "benchmarks/prompts/soap-plano.md",
+        "raw": "{\"plano_conduta\":\"Retorno em 30 dias.\",\"alertas_revisao\":[]}",
+        "partial": { "plano_conduta": "Retorno em 30 dias.", "alertas_revisao": [] },
+        "schema_coerced": false,
+        "validation_errors": null
+      }
+    }
+  }
+}

@@ -58,12 +58,13 @@ Output: `benchmarks/results/<audio_stem>/<timestamp>/`
 - `summary.json` and `summary.md` ranked by WER
 - When `postprocess.enabled: true` (in YAML or via `--postprocess`), each JSON includes `transcription.raw_text` (Whisper), `transcription.text` (after LLM), `scores_raw` (WER/CER before LLM), and `scores` (after LLM). `summary.md` shows both columns.
 
-LLM postprocess is copied from `stacks.yaml` into `stacks_all_generated.yaml` when you run `generate_stacks_all.py`. Requires `OPENAI_API_KEY` in the environment (or `.env` via `load_dotenv`).
+LLM postprocess is copied from `stacks.yaml` into `stacks_all_generated.yaml` when you run `generate_stacks_all.py`. Requires `LLM_BASE_URL` (default `https://api.phihc.com`) and `LLM_API_KEY` in the environment (or `.env` via `load_dotenv`).
 
 ```bash
 # Full 64-stack matrix with LLM post-edit (from generated YAML)
 python benchmarks/generate_stacks_all.py
-export OPENAI_API_KEY=sk-...
+export LLM_BASE_URL=https://api.phihc.com
+export LLM_API_KEY=your-key
 python benchmarks/run_stack_benchmark.py --stacks benchmarks/stacks_all_generated.yaml
 
 # Or force LLM even if YAML has postprocess disabled
@@ -104,10 +105,11 @@ Output: `benchmarks/results/transcribe/<audio_stem>/<timestamp>/`
 
 ## LLM post-edit benchmark (WER before/after)
 
-Measure whether the optional LLM editor improves WER/CER on an existing transcript JSON (from `run_stack_benchmark.py` or the API). Requires `OPENAI_API_KEY` in the environment.
+Measure whether the optional LLM editor improves WER/CER on an existing transcript JSON (from `run_stack_benchmark.py` or the API). Requires `LLM_BASE_URL` and `LLM_API_KEY` in the environment.
 
 ```bash
-export OPENAI_API_KEY=sk-...
+export LLM_BASE_URL=https://api.phihc.com
+export LLM_API_KEY=your-key
 
 python benchmarks/run_postprocess_benchmark.py \
   --input benchmarks/results/anamnesia-4/20260617T132254Z/spectral_hpf_agc_loudness_vad.json \
@@ -154,6 +156,92 @@ Optional filler removal:
 python benchmarks/score_transcripts.py ... --remove-fillers
 ```
 
+## Speaker inference test (LLM-only, no diarization)
+
+Test whether the LLM can assign `Autor:` / `Paciente:` **per turn** from plain Whisper text **without** pyannote diarization.
+Each turn includes `rotulo`, `identificavel`, `confianca` and `motivo`. The model fills `identificacao` first, then `turnos`.
+
+```bash
+# From a flow-test or API transcript JSON (uses text + segments if present)
+.venv/bin/python benchmarks/run_speaker_inference_test.py \
+  --input benchmarks/results/anamnesia-3/flow-test-XXXX/result.json \
+  --format all
+
+# Or from raw text + optional segments JSON
+.venv/bin/python benchmarks/run_speaker_inference_test.py \
+  --text-file benchmarks/results/anamnesia-3/flow-test-XXXX/01_whisper_raw.txt \
+  --segments-file path/to/segments.json \
+  --format numbered
+```
+
+Formats: `plain` (one blob), `timestamped` (Whisper segment timestamps), `numbered` (`[1]` blocks), or `all`.
+
+Outputs under `benchmarks/results/speaker-inference-<timestamp>/`:
+- `00_input_*.txt` — what was sent to the LLM
+- `01_result_*.json` — full JSON response + `identificacao_summary`
+- `02_labeled_*.txt` — `Autor:` / `Paciente:` per turn
+- `report.json` — comparison across formats
+
+Pair with `run_flow_test.py --no-diarization` to generate `01_whisper_raw.txt` first.
+
+## ASR fix only (improve text, no SOAP, no diarization)
+
+Runs **only** the LLM editor prompt (`medical-transcript-editor.md`) on Whisper output.
+No pyannote, no Médico/Paciente labels, no SOAP.
+
+```bash
+# Full path: preprocess → Whisper → LLM improve
+.venv/bin/python benchmarks/run_asr_fix_test.py
+
+# Re-run LLM on existing Whisper text (fast)
+.venv/bin/python benchmarks/run_asr_fix_test.py \
+  --text-file benchmarks/results/anamnesia-3/flow-test-20260629T162404Z/01_whisper_raw.txt
+
+# With WER scoring
+.venv/bin/python benchmarks/run_asr_fix_test.py \
+  --text-file path/to/01_whisper_raw.txt \
+  --reference benchmarks/references/anamnesia-3.txt
+```
+
+Output: `02_llm_improved.txt` (the text you want), plus `diff.txt` and `report.json`.
+
+Equivalent via flow test (also skips SOAP):
+
+```bash
+.venv/bin/python benchmarks/run_flow_test.py --no-diarization --no-soap
+# improved text → 02_postprocess_text.txt
+```
+
+## Whisper config sweep (fixed WAV, no upload)
+
+Compare **faster-whisper only** settings on a pre-processed WAV — no upload, no preprocess, no LLM postprocess, no SOAP.
+
+Default audio: `uploads/processed/c07ffd25-6ebb-4262-a573-c91760d84f6e.wav` (consulta-real-1).  
+Reference: `benchmarks/references/consulta-real-1.txt`.
+
+Edit the matrix in `benchmarks/whisper_sweep_consulta-real-1.yaml` (`whisper_base` + `configs`). Swept knobs include `model`, `compute_type`, `inference_mode`, `batch_size`, `chunk_length`, `beam_size`, `vad_filter`.
+
+```bash
+# Full sweep (~11 configs; long audio + large-v3 can take 1–2 h on 6 GB GPU)
+python benchmarks/run_whisper_sweep_benchmark.py
+
+# Quick check: your current production-like stack
+python benchmarks/run_whisper_sweep_benchmark.py \
+  --only batched_large-v3_int8_b4
+
+# Subset
+python benchmarks/run_whisper_sweep_benchmark.py \
+  --only seq_large-v3_int8,batched_large-v3_int8_b2,batched_large-v3_int8_b4
+```
+
+Output: `benchmarks/results/whisper-sweep-consulta-real-1/<timestamp>/`
+
+- `<config_id>.json` — transcript, WER/CER, wall time, run metadata
+- `<config_id>.txt` — hypothesis text
+- `summary.md` / `summary.json` — ranked by WER, then wall time
+
+`distil-large-v3` is intentionally omitted (English-only). On ~6 GB VRAM, `batch_size` above 4–6 may OOM; failed runs are logged and the sweep continues.
+
 ## Stack matrix
 
 See [STACK_MATRIX.md](STACK_MATRIX.md) for all predefined stacks and suggested `.env` values.
@@ -184,6 +272,8 @@ benchmarks/
   stacks_all_generated.yaml
   score_transcripts.py     # compare existing JSON files
   run_postprocess_benchmark.py  # LLM post-edit WER/CER before vs after
+  whisper_sweep_consulta-real-1.yaml  # Whisper-only config matrix (fixed WAV)
+  run_whisper_sweep_benchmark.py  # sweep inference_mode / batch / model / compute_type
   prompts/
     medical-transcript-editor.md  # production LLM editor prompt
     fix-whisper-transcript.md     # legacy specialty-specific example

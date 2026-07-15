@@ -39,6 +39,40 @@ def normalize_audio(input_path: Path, output_wav_path: Path) -> Path:
     return output_wav_path
 
 
+def concat_wavs(wav_paths: list[Path], output_path: Path) -> Path:
+    """Concatenate WAV files that all share the same format (sample rate,
+    channels, sample width) by appending raw PCM frames — no re-encoding, so
+    this is lossless. Callers must normalize each input first (normalize_audio
+    always produces the same canonical format), otherwise the frames won't
+    line up and the result will play back distorted/at the wrong speed."""
+    if not wav_paths:
+        raise ValueError("concat_wavs requires at least one input path")
+
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+
+    with wave.open(str(wav_paths[0]), "rb") as first:
+        params = first.getparams()
+
+    with wave.open(str(output_path), "wb") as out:
+        out.setparams(params)
+        for path in wav_paths:
+            with wave.open(str(path), "rb") as segment:
+                segment_params = segment.getparams()
+                if (
+                    segment_params.nchannels != params.nchannels
+                    or segment_params.framerate != params.framerate
+                    or segment_params.sampwidth != params.sampwidth
+                ):
+                    raise ValueError(
+                        f"concat_wavs: format mismatch in {path} "
+                        f"(expected {params.nchannels}ch/{params.framerate}Hz/{params.sampwidth * 8}bit, "
+                        f"got {segment_params.nchannels}ch/{segment_params.framerate}Hz/{segment_params.sampwidth * 8}bit)"
+                    )
+                out.writeframes(segment.readframes(segment.getnframes()))
+
+    return output_path
+
+
 def export_pcm(wav_path: Path, output_pcm_path: Path) -> Path:
     output_pcm_path.parent.mkdir(parents=True, exist_ok=True)
     _apply_filters(wav_path, output_pcm_path, output_format="s16le")

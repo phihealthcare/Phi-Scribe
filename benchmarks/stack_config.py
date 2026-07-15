@@ -1,6 +1,9 @@
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Any
+
+ROOT = Path(__file__).resolve().parents[1]
 
 DEFAULT_STACK_ENV: dict[str, Any] = {
     "DENOISE_ENABLED": False,
@@ -75,4 +78,17 @@ def stack_env_to_preprocess_kwargs(stack_env: dict[str, Any]) -> dict[str, Any]:
         "vad_min_speech_duration_ms": int(stack_env["VAD_MIN_SPEECH_DURATION_MS"]),
         "vad_min_silence_duration_ms": int(stack_env["VAD_MIN_SILENCE_DURATION_MS"]),
         "vad_speech_pad_ms": int(stack_env["VAD_SPEECH_PAD_MS"]),
+        "export_pcm_enabled": _as_bool(stack_env.get("EXPORT_PCM_ENABLED", False)),
     }
+
+
+def resolve_whisper_block(whisper_cfg: dict[str, Any]) -> dict[str, Any]:
+    """Resolve whisper YAML block (e.g. initial_prompt_file → initial_prompt)."""
+    resolved = dict(whisper_cfg)
+    prompt_file = resolved.pop("initial_prompt_file", None)
+    if prompt_file and "initial_prompt" not in resolved:
+        path = Path(prompt_file)
+        if not path.is_absolute():
+            path = ROOT / path
+        resolved["initial_prompt"] = path.read_text(encoding="utf-8").strip()
+    return resolved

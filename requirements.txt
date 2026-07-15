@@ -1,16 +1,19 @@
 flask>=3.0.0
+flask-cors>=4.0.0
 python-dotenv>=1.0.0
 pyyaml>=6.0.0
 noisereduce>=3.0.0
 numpy>=1.26.0
 scipy>=1.11.0
+numba>=0.58.0
+pyloudnorm>=0.1.1
 pyrnnoise>=0.4.0
-deepfilternet>=0.5.0
 silero-vad>=5.1.2
 torch>=2.0.0
 # Optional: local stack testing only (not for production)
 faster-whisper>=1.0.0
-# Optional: LLM transcript post-edit (TRANSCRIPT_POSTPROCESS_ENABLED=true)
-openai>=1.0.0
+# LLM transcript post-edit uses stdlib HTTP against PhiHC /api/medgemma
+# Optional: speaker diarization (DIARIZATION_ENABLED=true; requires HF_TOKEN)
+pyannote.audio>=3.1.0
 # Required for WHISPER_FASTER_DEVICE=cuda when torch (CUDA 13) is also installed
 nvidia-cublas-cu12

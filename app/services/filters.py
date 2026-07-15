@@ -52,16 +52,13 @@ def apply_band_filters(
         return wav_path
 
     audio_int16, sample_rate, channels, sample_width = _read_wav(wav_path)
-    audio = audio_int16.astype(np.float32) / 32768.0
-
-    if hpf_hz is not None:
-        audio = sosfiltfilt(_build_sos(sample_rate, hpf_hz, "highpass", order), audio)
-
-    if lpf_hz is not None:
-        # Audio is 16 kHz after normalize (Nyquist 8 kHz); use ~7–7.5 kHz, not 10–12 kHz.
-        audio = sosfiltfilt(_build_sos(sample_rate, lpf_hz, "lowpass", order), audio)
-
-    filtered_int16 = np.clip(audio * 32768.0, -32768, 32767).astype(np.int16)
+    filtered_int16 = apply_band_filters_to_int16(
+        audio_int16,
+        sample_rate=sample_rate,
+        hpf_hz=hpf_hz,
+        lpf_hz=lpf_hz,
+        order=order,
+    )
     _write_wav(
         wav_path,
         filtered_int16,
@@ -70,6 +67,28 @@ def apply_band_filters(
         sample_width=sample_width,
     )
     return wav_path
+
+
+def apply_band_filters_to_int16(
+    audio_int16: np.ndarray,
+    *,
+    sample_rate: int = SAMPLE_RATE,
+    hpf_hz: float | None = None,
+    lpf_hz: float | None = None,
+    order: int = 2,
+) -> np.ndarray:
+    if hpf_hz is None and lpf_hz is None:
+        return audio_int16
+
+    audio = audio_int16.astype(np.float32) / 32768.0
+
+    if hpf_hz is not None:
+        audio = sosfiltfilt(_build_sos(sample_rate, hpf_hz, "highpass", order), audio)
+
+    if lpf_hz is not None:
+        audio = sosfiltfilt(_build_sos(sample_rate, lpf_hz, "lowpass", order), audio)
+
+    return np.clip(audio * 32768.0, -32768, 32767).astype(np.int16)
 
 
 def apply_highpass(wav_path: Path, *, cutoff_hz: float = 80.0, order: int = 2) -> Path:

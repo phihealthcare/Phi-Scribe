@@ -1,0 +1,249 @@
+/*
+ * Overrides on top of Bootstrap 5, tuned to the colors and layout in
+ * public/ui-template.jpeg.
+ */
+
+:root {
+  --scribe-bg: #f5f6f8;
+  --scribe-surface: #ffffff;
+  --scribe-border: #e5e7eb;
+  --scribe-text-muted: #6b7280;
+  --scribe-primary: #1a5c4a;
+  --scribe-primary-hover: #144839;
+  --scribe-accent-teal: #0f766e;
+  --scribe-accent-orange: #d97706;
+  --scribe-recording: #dc2626;
+}
+
+body {
+  background-color: var(--scribe-bg);
+}
+
+.scribe-layout {
+  width: 95%;
+  margin: 0 auto;
+}
+
+/* Header */
+
+.scribe-header {
+  background-color: var(--scribe-surface);
+  border: 1px solid var(--scribe-border);
+  border-radius: 0.75rem;
+}
+
+.scribe-logo-badge {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  background-color: var(--scribe-primary);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 0.8rem;
+}
+
+.scribe-meta-label {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--scribe-text-muted);
+  margin-bottom: 0.15rem;
+}
+
+.scribe-status-badge {
+  font-weight: 500;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid var(--scribe-border);
+}
+
+.scribe-recording-badge {
+  animation: scribe-recording-pulse 2s ease-in-out infinite;
+}
+
+@keyframes scribe-recording-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.6;
+  }
+}
+
+/* Cards */
+
+.scribe-card {
+  background-color: var(--scribe-surface);
+  border: 1px solid var(--scribe-border);
+  border-radius: 0.75rem;
+}
+
+/* Shared floor height so the 3 columns start aligned side by side without
+   re-stretching to match each other as one grows past this baseline (see
+   `align-items-start` on the row in ConsultationLayout.tsx). Same 60vh
+   reference as `.scribe-transcript-scroll`'s cap, so the transcript panel
+   naturally lines up with this floor too. Only applies once columns sit
+   side by side (Bootstrap's lg breakpoint, matching ConsultationLayout). */
+@media (min-width: 992px) {
+  .scribe-card {
+    min-height: 60vh;
+  }
+}
+
+.scribe-card-title {
+  font-size: 0.95rem;
+  font-weight: 600;
+  margin-bottom: 1rem;
+}
+
+/* Audio capture */
+
+.scribe-vu-meter {
+  display: flex;
+  align-items: flex-end;
+  gap: 3px;
+  height: 40px;
+}
+
+.scribe-vu-bar {
+  flex: 1;
+  background-color: var(--scribe-accent-teal);
+  opacity: 0.35;
+  border-radius: 2px;
+}
+
+.scribe-vu-bar:nth-child(3n) {
+  height: 40%;
+}
+
+.scribe-vu-bar:nth-child(3n + 1) {
+  height: 70%;
+}
+
+.scribe-vu-bar:nth-child(3n + 2) {
+  height: 55%;
+}
+
+.scribe-vu-bar:nth-child(5n) {
+  height: 90%;
+}
+
+.scribe-vu-bar-active {
+  opacity: 0.9;
+  background-color: var(--scribe-recording);
+  transition: height 80ms linear;
+}
+
+/* SOAP */
+
+.scribe-primary-btn {
+  background-color: var(--scribe-primary);
+  border-color: var(--scribe-primary);
+}
+
+.scribe-primary-btn:hover,
+.scribe-primary-btn:focus {
+  background-color: var(--scribe-primary-hover);
+  border-color: var(--scribe-primary-hover);
+}
+
+.scribe-soap-code {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+  background-color: var(--scribe-bg);
+  color: var(--scribe-primary);
+  font-weight: 700;
+  font-size: 0.75rem;
+  margin-top: 1.6rem;
+  flex-shrink: 0;
+}
+
+.scribe-soap-combined {
+  line-height: 1.5;
+}
+
+.scribe-entity-chip {
+  border: 1px solid var(--scribe-border);
+  font-weight: 500;
+  padding: 0.4rem 0.65rem;
+}
+
+/* Transcript */
+
+.scribe-transcript-scroll {
+  height: 500px;
+}
+
+@media (max-width: 991.98px) {
+  .scribe-transcript-scroll {
+    height: 320px;
+  }
+}
+
+.scribe-segment-bar {
+  width: 3px;
+  border-radius: 2px;
+  align-self: stretch;
+  flex-shrink: 0;
+}
+
+.scribe-segment-speaker {
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.scribe-segment-speaker-btn {
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+}
+
+.scribe-segment-speaker-btn:hover {
+  text-decoration: underline;
+}
+
+.scribe-speaker-editor {
+  background-color: var(--scribe-bg);
+  border: 1px solid var(--scribe-border);
+  border-radius: 0.5rem;
+  padding: 0.5rem;
+}
+
+.scribe-segment-text {
+  font-size: 0.9rem;
+  line-height: 1.4;
+}
+
+.scribe-speaker-medico .scribe-segment-bar {
+  background-color: var(--scribe-accent-teal);
+}
+
+.scribe-speaker-medico .scribe-segment-speaker {
+  color: var(--scribe-accent-teal);
+}
+
+.scribe-speaker-paciente .scribe-segment-bar {
+  background-color: var(--scribe-accent-orange);
+}
+
+.scribe-speaker-paciente .scribe-segment-speaker {
+  color: var(--scribe-accent-orange);
+}
+
+.scribe-speaker-outro .scribe-segment-bar {
+  background-color: var(--scribe-text-muted);
+}
+
+.scribe-speaker-outro .scribe-segment-speaker {
+  color: var(--scribe-text-muted);
+}

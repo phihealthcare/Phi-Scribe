@@ -1,0 +1,44 @@
+{
+  "file_id": "8f14e45f-ceea-4b8d-9f0a-1f2b3c4d5e6f",
+  "source_audio": "uploads/processed/8f14e45f-ceea-4b8d-9f0a-1f2b3c4d5e6f.wav",
+  "preprocessing": "upload_pipeline",
+  "source": "faster-whisper",
+  "experimental": true,
+  "diarization_enabled": true,
+  "transcription": {
+    "text": "MÉDICO: Bom dia, Helena. Como a senhora está se sentindo desde a última consulta?\nPACIENTE: Bom dia, doutora. A dor de cabeça melhorou um pouco, mas ainda aparece no fim da tarde.\nMÉDICO: Certo. A senhora continuou tomando a losartana de 50 mg todos os dias?\nPACIENTE: Sim, toda manhã. Só esqueci uma vez no fim de semana.\nMÉDICO: Tudo bem. Vamos aferir sua pressão agora e ver como estão os valores hoje.",
+    "segments": [
+      { "start_ms": 3000, "end_ms": 10400, "speaker": "0", "speaker_label": "MÉDICO", "text": "Bom dia, Helena. Como a senhora está se sentindo desde a última consulta?" },
+      { "start_ms": 11200, "end_ms": 23100, "speaker": "1", "speaker_label": "PACIENTE", "text": "Bom dia, doutora. A dor de cabeça melhorou um pouco, mas ainda aparece no fim da tarde." },
+      { "start_ms": 24000, "end_ms": 30500, "speaker": "0", "speaker_label": "MÉDICO", "text": "Certo. A senhora continuou tomando a losartana de 50 mg todos os dias?" },
+      { "start_ms": 31000, "end_ms": 40200, "speaker": "1", "speaker_label": "PACIENTE", "text": "Sim, toda manhã. Só esqueci uma vez no fim de semana." },
+      { "start_ms": 42000, "end_ms": 50800, "speaker": "0", "speaker_label": "MÉDICO", "text": "Tudo bem. Vamos aferir sua pressão agora e ver como estão os valores hoje." }
+    ]
+  },
+  "postprocess": {
+    "enabled": true,
+    "provider": "phihc",
+    "model": "gemma3:12b-it-qat",
+    "skipped": false,
+    "error": null
+  },
+  "soap_draft": {
+    "enabled": true,
+    "provider": "phihc",
+    "model": "gemma3:12b-it-qat",
+    "prompt_path": "benchmarks/prompts/soap-draft.md",
+    "skipped": false,
+    "error": null,
+    "diarization_enabled": true,
+    "postprocess_applied": true,
+    "document": {
+      "soap": {
+        "subjetivo": "Cefaleia vespertina, em melhora. Refere boa adesão ao anti-hipertensivo.",
+        "objetivo": "Aferição de PA em andamento...",
+        "avaliacao": "HAS em acompanhamento; cefaleia provavelmente tensional.",
+        "plano": "Manter losartana 50 mg/dia; reavaliar em 30 dias."
+      }
+    },
+    "plain_text": "Cefaleia vespertina, em melhora. Refere boa adesão ao anti-hipertensivo.\n\nObjetivo\n\nAferição de PA em andamento...\n\nAvaliação\n\nHAS em acompanhamento; cefaleia provavelmente tensional.\n\nPlano\n\nManter losartana 50 mg/dia; reavaliar em 30 dias."
+  }
+}

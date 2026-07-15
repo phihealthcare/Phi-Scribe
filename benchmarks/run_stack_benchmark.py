@@ -17,10 +17,11 @@ from dotenv import load_dotenv
 
 from app.services.audio_processor import preprocess_audio
 from app.services.transcribe import transcribe_options_from_mapping, transcribe_wav
+from app.services.llm_client import DEFAULT_LLM_BASE_URL
 from app.services.transcript_postprocess import edit_transcript, format_diff_log, save_postprocess_diff_file
 from benchmarks.report import build_summary_rows, write_summary_json, write_summary_markdown
 from benchmarks.score import load_reference_text, score_transcript
-from benchmarks.stack_config import merge_stack_env, stack_env_to_preprocess_kwargs
+from benchmarks.stack_config import merge_stack_env, resolve_whisper_block, stack_env_to_preprocess_kwargs
 
 load_dotenv()
 
@@ -67,17 +68,22 @@ def _postprocess_options_from_config(config: dict, *, cli_enabled: bool | None =
     model = (
         postprocess_cfg.get("model")
         or os.environ.get("TRANSCRIPT_POSTPROCESS_MODEL", "").strip()
-        or "gpt-4o-mini"
+        or "gemma3:12b-it-qat"
+    )
+    llm_base_url = (
+        str(postprocess_cfg.get("llm_base_url") or os.environ.get("LLM_BASE_URL", "")).strip().rstrip("/")
+        or DEFAULT_LLM_BASE_URL
     )
 
     return {
         "enabled": enabled,
         "provider": str(
             postprocess_cfg.get("provider")
-            or os.environ.get("TRANSCRIPT_POSTPROCESS_PROVIDER", "openai")
+            or os.environ.get("TRANSCRIPT_POSTPROCESS_PROVIDER", "phihc")
         ),
         "model": str(model),
-        "api_key": os.environ.get("OPENAI_API_KEY", "").strip() or None,
+        "base_url": llm_base_url,
+        "api_key": os.environ.get("LLM_API_KEY", "").strip(),
         "prompt_path": prompt_path,
     }
 
@@ -97,6 +103,7 @@ def _apply_postprocess(
         enabled=True,
         provider=postprocess_options["provider"],
         model=postprocess_options["model"],
+        base_url=postprocess_options["base_url"],
         api_key=postprocess_options["api_key"],
         prompt_path=postprocess_options["prompt_path"],
         preprocessing_stages=stages,
@@ -185,7 +192,7 @@ def main() -> int:
         "--postprocess",
         action=argparse.BooleanOptionalAction,
         default=None,
-        help="Run LLM post-edit after Whisper (overrides YAML/env; requires OPENAI_API_KEY)",
+        help="Run LLM post-edit after Whisper (overrides YAML/env; requires LLM_BASE_URL)",
     )
     parser.add_argument("--output", help="Output directory override")
     args = parser.parse_args()
@@ -202,10 +209,12 @@ def main() -> int:
         return 1
 
     reference_text = load_reference_text(reference_path)
-    whisper_cfg = config["whisper"]
+    whisper_cfg = resolve_whisper_block(config["whisper"])
     postprocess_options = _postprocess_options_from_config(config, cli_enabled=args.postprocess)
+    if postprocess_options.get("enabled") and not postprocess_options.get("base_url"):
+        print("Warning: postprocess enabled but LLM_BASE_URL is not set.", file=sys.stderr)
     if postprocess_options.get("enabled") and not postprocess_options.get("api_key"):
-        print("Warning: postprocess enabled but OPENAI_API_KEY is not set.", file=sys.stderr)
+        print("Warning: postprocess enabled but LLM_API_KEY is not set.", file=sys.stderr)
     stacks: dict = config["stacks"]
 
     selected = list(stacks.keys())

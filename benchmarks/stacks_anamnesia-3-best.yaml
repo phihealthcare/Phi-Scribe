@@ -1,0 +1,33 @@
+audio: public/anamnesia-3.mp3
+reference: benchmarks/references/anamnesia-3.txt
+
+postprocess:
+  enabled: true
+  provider: phihc
+  model: gemma3:12b-it-qat
+
+whisper:
+  model: large-v3
+  device: cuda
+  compute_type: int8_float16
+  language: pt
+  beam_size: 5
+  initial_prompt_file: benchmarks/prompts/whisper-initial-hotwords.txt
+  compression_ratio_threshold: 1.8
+  log_prob_threshold: -0.8
+  hallucination_silence_threshold: 1.0
+  condition_on_previous_text: false
+  vad_filter: false
+
+stacks:
+  spectral_lpf_agc:
+    DENOISE_ENABLED: true
+    DENOISE_PROP_DECREASE: 0.6
+    LPF_ENABLED: true
+    LPF_CUTOFF_HZ: 7500.0
+    AGC_ENABLED: true
+    AGC_TARGET_DBFS: -20.0
+    AGC_MAX_GAIN_DB: 12.0
+    AGC_WINDOW_MS: 30
+    ENHANCE_VOICE_ENABLED: false
+    ENHANCE_DEEP_ENABLED: false

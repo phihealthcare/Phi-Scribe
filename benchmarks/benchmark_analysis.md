@@ -5,7 +5,7 @@
 
 ---
 
-## 1. Resumo  
+## 1. Resumo
 
 
 | Áudio                    | Último run         | Postprocess  | Melhor stack                    | WER        | CER    |

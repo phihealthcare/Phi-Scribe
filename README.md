@@ -239,17 +239,22 @@ cp .env.example .env
 python run.py
 ```
 
-**Experimental local transcription** (stack testing only — not for production):
+`faster-whisper`, `torch`, `pyannote.audio` (diarization), and `nvidia-cublas-cu12` are already included in `requirements.txt` — no separate install step needed.
 
-```bash
-pip install -r requirements-experimental.txt
-```
-
-For **GPU** (`WHISPER_FASTER_DEVICE=cuda`), `requirements-experimental.txt` includes `nvidia-cublas-cu12` — needed because `faster-whisper` uses CUDA 12 libraries while PyTorch (Silero VAD) uses CUDA 13. Without it you may see: `Library libcublas.so.12 is not found`.
+For **GPU** (`WHISPER_FASTER_DEVICE=cuda`), `nvidia-cublas-cu12` is needed because `faster-whisper` uses CUDA 12 libraries while PyTorch (Silero VAD) uses CUDA 13. Without it you may see: `Library libcublas.so.12 is not found`.
 
 Production will use the **OpenAI Whisper API** wired to our LLM. `faster-whisper` is decoupled and only used to evaluate preprocessing stacks locally.
 
 **System dependency:** `ffmpeg` (audio conversion).
+
+**Sortformer diarization backend (optional):** `DIARIZATION_BACKEND=sortformer` is an alternate diarization backend to the default `pyannote.audio` one. It runs `benchmarks/sortformer_worker.py` in its own **separate virtualenv** — `nemo_toolkit` conflicts with `pyannote.audio`'s dependencies if installed in the main `.venv`. Create it once, only if you plan to use this backend:
+
+```bash
+python3 -m venv .venv-sortformer
+.venv-sortformer/bin/pip install nemo_toolkit[asr]
+```
+
+Not required for the default (`pyannote.audio`) diarization path.
 
 **Optional preprocessing variables** (`.env`):
 
@@ -291,30 +296,36 @@ Upload metadata includes `requested_device`, resolved `device`, `model_device`, 
 **Experimental transcription variables** (`.env`, local testing only):
 
 
-| Variable                                         | Default       | Description                                                                |
-| ------------------------------------------------ | ------------- | -------------------------------------------------------------------------- |
-| `WHISPER_FASTER_ENABLED`                         | `false`       | Enables `POST /api/v1/audio/<file_id>/transcribe`                          |
-| `WHISPER_FASTER_MODEL`                           | `small`       | Model size: `tiny`, `base`, `small`, `medium`, `large-v3`                  |
-| `WHISPER_FASTER_DEVICE`                          | `cpu`         | `cpu` or `cuda`                                                            |
-| `WHISPER_FASTER_COMPUTE_TYPE`                    | `int8`        | `int8` (CPU), `float16` (GPU)                                              |
-| `WHISPER_FASTER_LANGUAGE`                        | `pt`          | Language code                                                              |
-| `WHISPER_FASTER_BEAM_SIZE`                       | `5`           | Beam search width                                                          |
-| `WHISPER_FASTER_INITIAL_PROMPT`                  | (clinical PT) | Optional prompt for medical Portuguese                                     |
-| `WHISPER_FASTER_COMPRESSION_RATIO_THRESHOLD`     | `2.4`         | Reject repetitive segments above this gzip ratio (lower = stricter)        |
-| `WHISPER_FASTER_LOG_PROB_THRESHOLD`              | `-1.0`        | Reject low-confidence segments (higher = stricter, e.g. `-0.8`)            |
-| `WHISPER_FASTER_HALLUCINATION_SILENCE_THRESHOLD` | (unset)       | Skip suspected hallucinations after N seconds of silence                   |
-| `WHISPER_FASTER_CONDITION_ON_PREVIOUS_TEXT`      | `true`        | Use prior segment as context (`false` can reduce repetition on long files) |
-| `WHISPER_FASTER_VAD_FILTER`                      | `false`       | faster-whisper internal VAD (separate from upload `VAD_ENABLED`)           |
+| Variable                                         | Default       | Description                                                                                                          |
+| ------------------------------------------------ | ------------- | -------------------------------------------------------------------------------------------------------------------- |
+| `WHISPER_FASTER_ENABLED`                         | `false`       | Enables `POST /api/v1/audio/<file_id>/transcribe`                                                                    |
+| `WHISPER_FASTER_MODEL`                           | `small`       | Model: `tiny`, `base`, `small`, `medium`, `large-v3`, `distil-large-v3`, `distil-large-v3.5`, `turbo`, or HF repo id |
+| `WHISPER_FASTER_DEVICE`                          | `cpu`         | `cpu` or `cuda`                                                                                                      |
+| `WHISPER_FASTER_COMPUTE_TYPE`                    | `int8`        | `int8` (CPU), `float16` (GPU)                                                                                        |
+| `WHISPER_FASTER_LANGUAGE`                        | `pt`          | Language code                                                                                                        |
+| `WHISPER_FASTER_BEAM_SIZE`                       | `5`           | Beam search width                                                                                                    |
+| `WHISPER_FASTER_INITIAL_PROMPT`                  | (clinical PT) | Optional prompt for medical Portuguese                                                                               |
+| `WHISPER_FASTER_COMPRESSION_RATIO_THRESHOLD`     | `2.4`         | Reject repetitive segments above this gzip ratio (lower = stricter)                                                  |
+| `WHISPER_FASTER_LOG_PROB_THRESHOLD`              | `-1.0`        | Reject low-confidence segments (higher = stricter, e.g. `-0.8`)                                                      |
+| `WHISPER_FASTER_HALLUCINATION_SILENCE_THRESHOLD` | (unset)       | Skip suspected hallucinations after N seconds of silence                                                             |
+| `WHISPER_FASTER_CONDITION_ON_PREVIOUS_TEXT`      | `true`        | Use prior segment as context (`false` can reduce repetition on long files)                                           |
+| `WHISPER_FASTER_VAD_FILTER`                      | `false`       | faster-whisper internal VAD (separate from upload `VAD_ENABLED`)                                                     |
+
 
 **LLM transcript post-edit** (optional, after Whisper — `.env`):
 
-| Variable                           | Default                                         | Description                                                                 |
-| ---------------------------------- | ----------------------------------------------- | --------------------------------------------------------------------------- |
-| `TRANSCRIPT_POSTPROCESS_ENABLED`   | `false`                                         | Run LLM editor on Whisper output before returning `transcription.text`      |
-| `TRANSCRIPT_POSTPROCESS_PROVIDER`  | `openai`                                        | Provider (`openai` only for now)                                            |
-| `OPENAI_API_KEY`                   | (unset)                                         | API key; post-edit is skipped if missing                                    |
-| `TRANSCRIPT_POSTPROCESS_MODEL`     | `gpt-4o-mini`                                   | Chat model for post-edit                                                    |
-| `TRANSCRIPT_POSTPROCESS_PROMPT_PATH` | `benchmarks/prompts/medical-transcript-editor.md` | System prompt file (specialty-agnostic pt-BR medical editor)              |
+
+| Variable                             | Default                                           | Description                                                                                            |
+| ------------------------------------ | ------------------------------------------------- | ------------------------------------------------------------------------------------------------------ |
+| `TRANSCRIPT_POSTPROCESS_ENABLED`     | `false`                                           | Run LLM editor on Whisper output before returning `transcription.text`                                 |
+| `ASR_FIX_ENABLED`                    | `true`                                            | When postprocess is on, run step 04 ASR fix; set `false` to skip ASR fix and feed Whisper text to SOAP |
+| `TRANSCRIPT_POSTPROCESS_PROVIDER`    | `phihc`                                           | Provider label (informational)                                                                         |
+| `LLM_BASE_URL`                       | `https://api.phihc.com`                           | PhiHC API host; requests go to `/api/medgemma`                                                         |
+| `LLM_API_KEY`                        | (required when postprocess enabled)               | Bearer token for PhiHC MedGemma API                                                                    |
+| `TRANSCRIPT_POSTPROCESS_MODEL`       | `gemma3:12b-it-qat`                               | Chat model for post-edit and SOAP draft                                                                |
+| `TRANSCRIPT_POSTPROCESS_PROMPT_PATH` | `benchmarks/prompts/medical-transcript-editor.md` | System prompt file (specialty-agnostic pt-BR medical editor)                                           |
+| `SOAP_DRAFT_PROMPT_PATH`             | `benchmarks/prompts/soap-draft.md`                | SOAP draft system prompt (runs when postprocess is enabled)                                            |
+
 
 When `TRANSCRIPT_POSTPROCESS_ENABLED=false`, transcribe responses are unchanged. When enabled, `transcription.text` is the corrected transcript and `transcription.raw_text` holds the raw Whisper output. On LLM failure, `transcription.text` stays raw and `postprocess.error` describes the failure.
 
@@ -324,12 +335,12 @@ Pipeline:
 upload (preprocess) → transcribe_wav (faster-whisper) → [optional] LLM editor → API response
 ```
 
-Prompt: [benchmarks/prompts/medical-transcript-editor.md](benchmarks/prompts/medical-transcript-editor.md). Legacy gynecology-specific example: [benchmarks/prompts/fix-whisper-transcript.md](benchmarks/prompts/fix-whisper-transcript.md).
+Prompt: [benchmarks/prompts/medical-transcript-editor.md](benchmarks/prompts/medical-transcript-editor.md).
 
 ```
 POST /api/v1/audio/upload
 Content-Type: multipart/form-data
-Field: file (MP3 or WAV)
+Field: file (MP3, WAV, or MP4)
 ```
 
 ```
@@ -342,12 +353,12 @@ Experimental — transcribes an already processed WAV (`uploads/processed/<file_
 POST /api/v1/audio/public/<stem>/transcribe
 ```
 
-Raw transcription — reads `public/<stem>.mp3` or `public/<stem>.wav` directly. **No preprocessing.** Example: `POST /api/v1/audio/public/anamnesia-1/transcribe` uses `public/anamnesia-1.mp3`.
+Raw transcription — reads `public/<stem>.mp3`, `.wav`, or `.mp4` directly. **No preprocessing.** Example: `POST /api/v1/audio/public/anamnesia-1/transcribe` uses `public/anamnesia-1.mp3`.
 
 ```
 POST /api/v1/audio/transcribe/raw
 Content-Type: multipart/form-data
-Field: file (MP3 or WAV)
+Field: file (MP3, WAV, or MP4)
 ```
 
 Raw transcription — transcribes the uploaded file as-is. **No preprocessing.**

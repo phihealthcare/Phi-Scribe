@@ -9,8 +9,11 @@ venv/
 htmlcov/
 uploads/
 public/
-benchmarks/results
-app/services/crisper/
-tests/test_crisper_transcribe.py
-benchmarks/run_crisper_transcribe.py
-requirements-crisper.txt
+benchmarks/results/
+
+.venv-sortformer/
+
+# editor/OS noise
+.DS_Store
+.idea/
+.vscode/

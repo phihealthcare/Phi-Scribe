@@ -1,9 +1,10 @@
-audio: public/anamnesia-4.mp3
-reference: benchmarks/references/anamnesia-4.txt
+audio: public/consulta-real-1.mp4
+reference: benchmarks/references/consulta-real-1.txt
 
 postprocess:
   enabled: true
-  model: gpt-4o
+  provider: phihc
+  model: gemma3:12b-it-qat
   prompt_path: benchmarks/prompts/medical-transcript-editor.md
 
 whisper:
@@ -12,7 +13,7 @@ whisper:
   compute_type: int8_float16
   language: pt
   beam_size: 5
-  initial_prompt: "Transcrição literal de anamnese em português brasileiro. Diálogo entre médica interna e paciente. Preservar a fala original."
+  initial_prompt_file: benchmarks/prompts/whisper-initial-hotwords.txt
   compression_ratio_threshold: 1.8
   log_prob_threshold: -0.8
   hallucination_silence_threshold: 1.0

@@ -1,0 +1,12 @@
+---
+description: Rules for frontend/ (Phi Scribe React UI)
+globs: frontend/**
+alwaysApply: true
+---
+
+- Components in `frontend/src/components/` and `frontend/src/pages/` must not import `fetch` or call HTTP directly. All HTTP lives in `frontend/src/api/`.
+- UI kit is Bootstrap 5 + react-bootstrap. Do not install or use Tailwind CSS.
+- Visual reference: `public/ui-template.jpeg`. Functional/non-functional requirements: `public/requisitos-scribe.md`.
+- Do not modify the Flask backend (`app/`, `run.py`, `requirements.txt`) without an explicit request.
+- Live microphone recording is implemented via useAudioRecorder (Fase 5). Do not add WebSocket or real-time transcription unless explicitly requested — the flow is upload/record → `/upload` → `/{file_id}/transcribe` (synchronous).
+- Types in `frontend/src/api/types.ts` are frozen after Fase 0; only change them with explicit approval.

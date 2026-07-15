@@ -1,0 +1,130 @@
+# Whisper-only sweep on pre-processed consulta-real-1 audio.
+# No upload/preprocess, no LLM postprocess, no SOAP.
+#
+# Audio was produced by the normal pipeline for file id c07ffd25-6ebb-4262-a573-c91760d84f6e.
+wav: uploads/processed/c07ffd25-6ebb-4262-a573-c91760d84f6e.wav
+reference: benchmarks/references/consulta-real-1.txt
+
+# Shared Whisper settings (held constant unless overridden per config).
+whisper_base:
+  device: cuda
+  language: pt
+  beam_size: 5
+  initial_prompt_file: benchmarks/prompts/whisper-initial-hotwords.txt
+  compression_ratio_threshold: 1.8
+  log_prob_threshold: -0.8
+  hallucination_silence_threshold: 1.0
+  condition_on_previous_text: false
+  vad_filter: false
+  word_timestamps: false
+
+# Each entry merges on top of whisper_base. Only Whisper / faster-whisper knobs vary.
+# distil-large-v3 is omitted — English-only, unsuitable for PT-BR clinical audio.
+configs:
+  seq_large-v3_int8:
+    label: sequential · large-v3 · int8
+    model: large-v3
+    inference_mode: sequential
+    compute_type: int8
+
+  batched_large-v3_int8_b2:
+    label: batched · large-v3 · int8 · batch=2
+    model: large-v3
+    inference_mode: batched
+    compute_type: int8
+    batch_size: 2
+
+  batched_large-v3_int8_b4:
+    label: batched · large-v3 · int8 · batch=4
+    model: large-v3
+    inference_mode: batched
+    compute_type: int8
+    batch_size: 4
+
+  batched_large-v3_int8_b6:
+    label: batched · large-v3 · int8 · batch=6
+    model: large-v3
+    inference_mode: batched
+    compute_type: int8
+    batch_size: 6
+
+  batched_large-v3_int8_b4_chunk30:
+    label: batched · large-v3 · int8 · batch=4 · chunk=30s
+    model: large-v3
+    inference_mode: batched
+    compute_type: int8
+    batch_size: 4
+    chunk_length: 30
+
+  batched_large-v3_int8_float16_b4:
+    label: batched · large-v3 · int8_float16 · batch=4
+    model: large-v3
+    inference_mode: batched
+    compute_type: int8_float16
+    batch_size: 4
+
+  seq_large-v3_int8_float16:
+    label: sequential · large-v3 · int8_float16
+    model: large-v3
+    inference_mode: sequential
+    compute_type: int8_float16
+
+  seq_turbo_int8:
+    label: sequential · turbo · int8
+    model: turbo
+    inference_mode: sequential
+    compute_type: int8
+
+  batched_turbo_int8_b4:
+    label: batched · turbo · int8 · batch=4
+    model: turbo
+    inference_mode: batched
+    compute_type: int8
+    batch_size: 4
+
+  batched_large-v3_int8_b4_beam1:
+    label: batched · large-v3 · int8 · batch=4 · beam=1
+    model: large-v3
+    inference_mode: batched
+    compute_type: int8
+    batch_size: 4
+    beam_size: 1
+
+  batched_large-v3_int8_b4_vad:
+    label: batched · large-v3 · int8 · batch=4 · vad_filter
+    model: large-v3
+    inference_mode: batched
+    compute_type: int8
+    batch_size: 4
+    vad_filter: true
+
+  batched_large-v3_int8_b4_beam1_cpu8:
+    label: batched · large-v3 · int8 · batch=4 · beam=1
+    model: large-v3
+    inference_mode: batched
+    compute_type: int8
+    batch_size: 4
+    beam_size: 1
+
+  batched_turbo_int8_b4_beam1_cpu8:
+    label: batched · turbo · int8 · batch=4 · beam=1
+    model: turbo
+    inference_mode: batched
+    compute_type: int8
+    batch_size: 4
+    beam_size: 1
+
+  seq_turbo_int8_beam1_cpu8:
+    label: sequential · turbo · int8 · beam=1
+    model: turbo
+    inference_mode: sequential
+    compute_type: int8
+    beam_size: 1
+
+  batched_turbo_int8_b2_beam1_cpu8:
+    label: batched · turbo · int8 · batch=2 · beam=1
+    model: turbo
+    inference_mode: batched
+    compute_type: int8
+    batch_size: 2
+    beam_size: 1

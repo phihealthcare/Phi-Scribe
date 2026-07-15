@@ -15,7 +15,8 @@ from dotenv import load_dotenv
 
 from benchmarks.report import extract_hypothesis_text
 from benchmarks.score import load_reference_text, score_transcript
-from app.services.transcript_postprocess import edit_transcript, format_diff_log, load_editor_prompt
+from app.services.llm_client import DEFAULT_LLM_BASE_URL
+from app.services.transcript_postprocess import edit_transcript, format_diff_log
 
 load_dotenv()
 
@@ -53,10 +54,15 @@ def main() -> int:
         default=None,
         help="Editor prompt path (default: benchmarks/prompts/medical-transcript-editor.md)",
     )
-    parser.add_argument("--model", default=os.environ.get("TRANSCRIPT_POSTPROCESS_MODEL", "gpt-4o-mini"))
+    parser.add_argument("--model", default=os.environ.get("TRANSCRIPT_POSTPROCESS_MODEL", "gemma3:12b-it-qat"))
     parser.add_argument(
         "--provider",
-        default=os.environ.get("TRANSCRIPT_POSTPROCESS_PROVIDER", "openai"),
+        default=os.environ.get("TRANSCRIPT_POSTPROCESS_PROVIDER", "phihc"),
+    )
+    parser.add_argument(
+        "--base-url",
+        default=os.environ.get("LLM_BASE_URL", "https://api.phihc.com").strip().rstrip("/"),
+        help="PhiHC API base URL (POST goes to /api/medgemma)",
     )
     args = parser.parse_args()
 
@@ -81,16 +87,16 @@ def main() -> int:
     before_scores = score_transcript(reference, raw_text)
 
     prompt_path = Path(args.prompt) if args.prompt else None
-    system_prompt = load_editor_prompt(prompt_path=prompt_path) if prompt_path else None
-    api_key = os.environ.get("OPENAI_API_KEY", "").strip() or None
+    base_url = args.base_url or DEFAULT_LLM_BASE_URL
+    api_key = os.environ.get("LLM_API_KEY", "").strip()
 
     result = edit_transcript(
         raw_text,
         enabled=True,
         provider=args.provider,
         model=args.model,
+        base_url=base_url,
         api_key=api_key,
-        system_prompt=system_prompt,
         prompt_path=prompt_path,
         preprocessing_stages=stages or None,
     )

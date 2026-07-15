@@ -5,11 +5,17 @@ import wave
 from pathlib import Path
 
 import numpy as np
+import pyloudnorm as pyln
 
 from app.services.normalize import CHANNELS, SAMPLE_RATE, SAMPLE_WIDTH
 
 _EPS = 1e-10
-_LUFS_PATTERN = re.compile(r"^\s*I:\s+(-?\d+(?:\.\d+)?)\s+LUFS")
+_INPUT_INTEGRATED_PATTERN = re.compile(r"Input Integrated:\s+(-?\d+(?:\.\d+)?)\s+LUFS")
+_OUTPUT_INTEGRATED_PATTERN = re.compile(r"Output Integrated:\s+(-?\d+(?:\.\d+)?)\s+LUFS")
+_INPUT_TRUE_PEAK_PATTERN = re.compile(r"Input True Peak:\s+(-?\d+(?:\.\d+)?)\s+dBFS")
+_OUTPUT_TRUE_PEAK_PATTERN = re.compile(r"Output True Peak:\s+(-?\d+(?:\.\d+)?)\s+dBFS")
+
+_VALID_MODES = frozenset({"lufs", "lufs_fast", "peak"})
 
 
 def _read_wav(wav_path: Path) -> tuple[np.ndarray, int, int, int]:
@@ -48,30 +54,17 @@ def _peak_dbfs(audio: np.ndarray) -> float:
     return 20.0 * math.log10(peak)
 
 
-def _measure_lufs(wav_path: Path) -> float | None:
-    result = subprocess.run(
-        [
-            "ffmpeg",
-            "-hide_banner",
-            "-i",
-            str(wav_path),
-            "-af",
-            "ebur128=peak=true",
-            "-f",
-            "null",
-            "-",
-        ],
-        check=True,
-        capture_output=True,
-        text=True,
-    )
+def _parse_loudnorm_summary(stderr: str) -> dict[str, float | None]:
+    def _first(pattern: re.Pattern[str]) -> float | None:
+        match = pattern.search(stderr)
+        return float(match.group(1)) if match else None
 
-    for line in reversed(result.stderr.splitlines()):
-        match = _LUFS_PATTERN.search(line)
-        if match:
-            return float(match.group(1))
-
-    return None
+    return {
+        "input_lufs": _first(_INPUT_INTEGRATED_PATTERN),
+        "output_lufs": _first(_OUTPUT_INTEGRATED_PATTERN),
+        "input_true_peak_dbfs": _first(_INPUT_TRUE_PEAK_PATTERN),
+        "output_true_peak_dbfs": _first(_OUTPUT_TRUE_PEAK_PATTERN),
+    }
 
 
 def _apply_lufs(
@@ -80,11 +73,14 @@ def _apply_lufs(
     target_lufs: float,
     true_peak: float,
     loudness_range: float,
-) -> None:
+) -> dict[str, float | None]:
+    """Single ffmpeg pass: loudnorm applies normalization and prints before/after summary."""
     temp_path = wav_path.with_suffix(".loudness.wav")
-    filter_chain = f"loudnorm=I={target_lufs}:TP={true_peak}:LRA={loudness_range}"
+    filter_chain = (
+        f"loudnorm=I={target_lufs}:TP={true_peak}:LRA={loudness_range}:print_format=summary"
+    )
 
-    subprocess.run(
+    result = subprocess.run(
         [
             "ffmpeg",
             "-y",
@@ -106,6 +102,71 @@ def _apply_lufs(
         text=True,
     )
     temp_path.replace(wav_path)
+    return _parse_loudnorm_summary(result.stderr)
+
+
+def _apply_lufs_fast(
+    wav_path: Path,
+    *,
+    target_lufs: float,
+    true_peak: float,
+) -> dict[str, float | None]:
+    """Measure integrated LUFS (pyloudnorm) and apply a constant gain + peak ceiling.
+
+    Faster than ffmpeg loudnorm: no dynamics/LRA processing, one in-memory pass.
+    """
+    audio_int16, sample_rate, channels, sample_width = _read_wav(wav_path)
+    audio = audio_int16.astype(np.float64) / 32768.0
+
+    meter = pyln.Meter(sample_rate)
+    try:
+        input_lufs = float(meter.integrated_loudness(audio))
+    except ValueError:
+        # Too quiet / silent for BS.1770
+        return {
+            "input_lufs": None,
+            "output_lufs": None,
+            "input_true_peak_dbfs": _peak_dbfs(audio.astype(np.float32)),
+            "output_true_peak_dbfs": _peak_dbfs(audio.astype(np.float32)),
+            "applied_gain_db": 0.0,
+        }
+
+    if not math.isfinite(input_lufs):
+        return {
+            "input_lufs": None,
+            "output_lufs": None,
+            "input_true_peak_dbfs": _peak_dbfs(audio.astype(np.float32)),
+            "output_true_peak_dbfs": _peak_dbfs(audio.astype(np.float32)),
+            "applied_gain_db": 0.0,
+        }
+
+    gain_db = target_lufs - input_lufs
+    gain_linear = 10 ** (gain_db / 20.0)
+    normalized = audio * gain_linear
+
+    # Soft true-peak ceiling (sample peak approximation of TP).
+    peak_limit = 10 ** (true_peak / 20.0)
+    peak = float(np.max(np.abs(normalized)))
+    if peak > peak_limit and peak > _EPS:
+        normalized = normalized * (peak_limit / peak)
+        gain_db += 20.0 * math.log10(peak_limit / peak)
+
+    output_lufs = float(meter.integrated_loudness(normalized))
+    normalized_int16 = np.clip(normalized * 32768.0, -32768, 32767).astype(np.int16)
+    _write_wav(
+        wav_path,
+        normalized_int16,
+        sample_rate=sample_rate,
+        channels=channels,
+        sample_width=sample_width,
+    )
+    return {
+        "input_lufs": round(input_lufs, 2),
+        "output_lufs": round(output_lufs, 2),
+        "input_true_peak_dbfs": None,
+        "output_true_peak_dbfs": None,
+        "applied_gain_db": round(gain_db, 2),
+    }
 
 
 def _apply_peak(wav_path: Path, *, peak_target_dbfs: float) -> float:
@@ -144,32 +205,44 @@ def apply_loudness(
     peak_target_dbfs: float = -1.0,
 ) -> dict:
     mode = mode.lower()
-    if mode not in {"lufs", "peak"}:
+    if mode not in _VALID_MODES:
         raise ValueError(f"Unknown loudness mode: {mode}")
 
     audio_int16, _, _, _ = _read_wav(wav_path)
     audio = audio_int16.astype(np.float32) / 32768.0
     input_peak_dbfs = _peak_dbfs(audio)
-    input_lufs = _measure_lufs(wav_path) if mode == "lufs" else None
 
     if mode == "lufs":
-        _apply_lufs(
+        summary = _apply_lufs(
             wav_path,
             target_lufs=target_lufs,
             true_peak=true_peak,
             loudness_range=loudness_range,
         )
+        input_lufs = summary.get("input_lufs")
+        output_lufs = summary.get("output_lufs")
+        audio_int16, _, _, _ = _read_wav(wav_path)
+        output_peak_dbfs = _peak_dbfs(audio_int16.astype(np.float32) / 32768.0)
         applied_gain_db = 0.0
+        if input_peak_dbfs > -120 and output_peak_dbfs > -120:
+            applied_gain_db = output_peak_dbfs - input_peak_dbfs
+    elif mode == "lufs_fast":
+        summary = _apply_lufs_fast(
+            wav_path,
+            target_lufs=target_lufs,
+            true_peak=true_peak,
+        )
+        input_lufs = summary.get("input_lufs")
+        output_lufs = summary.get("output_lufs")
+        applied_gain_db = float(summary.get("applied_gain_db") or 0.0)
+        audio_int16, _, _, _ = _read_wav(wav_path)
+        output_peak_dbfs = _peak_dbfs(audio_int16.astype(np.float32) / 32768.0)
     else:
+        input_lufs = None
         applied_gain_db = _apply_peak(wav_path, peak_target_dbfs=peak_target_dbfs)
-
-    audio_int16, _, _, _ = _read_wav(wav_path)
-    audio = audio_int16.astype(np.float32) / 32768.0
-    output_peak_dbfs = _peak_dbfs(audio)
-    output_lufs = _measure_lufs(wav_path) if mode == "lufs" else None
-
-    if mode == "lufs" and input_peak_dbfs > -120 and output_peak_dbfs > -120:
-        applied_gain_db = output_peak_dbfs - input_peak_dbfs
+        audio_int16, _, _, _ = _read_wav(wav_path)
+        output_peak_dbfs = _peak_dbfs(audio_int16.astype(np.float32) / 32768.0)
+        output_lufs = None
 
     return {
         "mode": mode,
