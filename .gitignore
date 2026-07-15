@@ -17,3 +17,5 @@ benchmarks/results/
 .DS_Store
 .idea/
 .vscode/
+.cursor/
+pytest.ini
