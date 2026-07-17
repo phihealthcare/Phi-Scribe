@@ -35,6 +35,7 @@ from app.services.soap_draft import (
 )
 from app.services.soap_prerequisites import can_generate_soap, soap_draft_skipped_result
 from app.services.transcript_postprocess import (
+    apply_diarization_label_mapping_to_segments,
     diarization_labels_applied,
     edit_transcript_from_config,
     manual_diarization_applied,
@@ -248,6 +249,12 @@ def _run_transcription(audio_path: Path, *, file_id: str, preprocessing: str) ->
             postprocess_applied = diarization_labels_applied(
                 postprocess_result
             ) or manual_diarization_applied(postprocess_result)
+
+            label_mapping = (postprocess_result.get("diarization_labels") or {}).get("mapping")
+            if label_mapping and isinstance(transcription.get("segments"), list):
+                transcription["segments"] = apply_diarization_label_mapping_to_segments(
+                    transcription["segments"], label_mapping
+                )
 
         if soap_enabled:
             # SOAP's prompts branch on whether the transcript text actually has

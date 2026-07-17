@@ -74,7 +74,7 @@ def test_label_diarized_puts_rules_in_user_prompt(tmp_path: Path) -> None:
     def fake_generate(**kwargs):
         captured["system_prompt"] = kwargs["system_prompt"]
         captured["prompt"] = kwargs["prompt"]
-        return "Médico: olá\nPaciente: bom dia", "raw"
+        return '{"falante_1": "Médico", "falante_2": "Paciente"}', "raw"
 
     with patch(
         "app.services.transcript_postprocess.medgemma_generate",

@@ -173,7 +173,7 @@ Detects **speech segments** vs. silence/noise.
 |                    |                                                                  |
 | ------------------ | ---------------------------------------------------------------- |
 | **Label**          | `vad`                                                            |
-| **Implementation** | Silero VAD (`trim` — removes long silences, concatenates speech) |
+| **Implementation** | Silero VAD, ONNX Runtime backend (`trim` — removes long silences, concatenates speech). CPU-only by design (~2.2x faster than the TorchScript backend for this call pattern — see `app/services/vad.py`); same model weights, identical output. |
 | **Good for**       | Trimming long silences, reducing Whisper inference cost          |
 | **Risk**           | Cutting word beginnings/endings; losing quiet speech             |
 | **Enable**         | `VAD_ENABLED=true` in `.env`                                     |

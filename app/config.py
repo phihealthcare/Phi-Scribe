@@ -273,6 +273,16 @@ class Config:
     ASR_FIX_CHUNK_MAX_WORKERS = int(os.environ.get("ASR_FIX_CHUNK_MAX_WORKERS", "2"))
     LLM_ASR_FIX_MAX_RETRIES = int(os.environ.get("LLM_ASR_FIX_MAX_RETRIES", "2"))
     LLM_SOAP_MAX_RETRIES = int(os.environ.get("LLM_SOAP_MAX_RETRIES", "0"))
+    # SOAP Subjetivo/Objetivo prompts are independent (no shared dependency) so
+    # they COULD run concurrently instead of waiting on each other. Defaults to
+    # false: confirmed empirically that api.phihc.com's medgemma endpoint
+    # returns HTTP 502 on both calls when the two large (~14k char) prompts
+    # are sent at the same time, while sending them sequentially always
+    # succeeds — the backend can't serve two concurrent large-context
+    # generations for this model. Only enable once the backend supports it.
+    SOAP_PARALLEL_SUBJETIVO_OBJETIVO = os.environ.get(
+        "SOAP_PARALLEL_SUBJETIVO_OBJETIVO", "false"
+    ).lower() in {"true", "1", "yes"}
     SOAP_PATIENT_CHART_CONTEXT = os.environ.get("SOAP_PATIENT_CHART_CONTEXT", "").strip()
     SOAP_PATIENT_CHART_FILE = os.environ.get("SOAP_PATIENT_CHART_FILE", "").strip()
     PIPELINE_DEBUG_LOG_ENABLED = os.environ.get("PIPELINE_DEBUG_LOG_ENABLED", "false").lower() in {

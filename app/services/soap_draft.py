@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import re
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Mapping
@@ -1042,6 +1043,9 @@ def _generate_soap_section(
     }
 
 
+_PARALLEL_SOAP_SECTION_IDS = frozenset({"subjetivo", "objetivo"})
+
+
 def _generate_soap_split(
     *,
     segmented_transcript: str,
@@ -1057,13 +1061,20 @@ def _generate_soap_split(
     timeout: int,
     max_retries: int,
     prompt_compact: bool = False,
+    # Defaults to sequential: confirmed empirically that api.phihc.com's
+    # medgemma endpoint returns HTTP 502 on both calls when Subjetivo+Objetivo
+    # (large prompts, ~14k chars) are sent concurrently, while the exact same
+    # prompts sent sequentially succeed every time — the backend can't serve
+    # two concurrent large-context generations for this model. Opt in via
+    # SOAP_PARALLEL_SUBJETIVO_OBJETIVO=true once the backend supports it.
+    parallel_subjetivo_objetivo: bool = False,
 ) -> dict[str, Any]:
     section_results: dict[str, dict[str, Any]] = {}
     partials: dict[str, dict[str, Any]] = {}
     coerced_sections: set[str] = set()
 
-    for spec in SOAP_SECTIONS:
-        section_result = _generate_soap_section(
+    def run_section(spec: SoapSectionSpec) -> dict[str, Any]:
+        return _generate_soap_section(
             spec,
             segmented_transcript=segmented_transcript,
             diarization_enabled=diarization_enabled,
@@ -1080,6 +1091,9 @@ def _generate_soap_split(
             max_retries=max_retries,
             prompt_compact=prompt_compact,
         )
+
+    def apply_result(spec: SoapSectionSpec, section_result: dict[str, Any]) -> dict[str, Any] | None:
+        """Store a section's outcome; return an early-return failure payload, or None on success."""
         section_results[spec.section_id] = section_result
         partial = section_result.get("partial")
         if partial is None:
@@ -1113,6 +1127,34 @@ def _generate_soap_split(
         if section_result.get("schema_coerced"):
             coerced_sections.add(spec.section_id)
         partials[spec.section_id] = partial
+        return None
+
+    parallel_specs = [spec for spec in SOAP_SECTIONS if spec.section_id in _PARALLEL_SOAP_SECTION_IDS]
+    sequential_specs = [spec for spec in SOAP_SECTIONS if spec.section_id not in _PARALLEL_SOAP_SECTION_IDS]
+
+    if parallel_subjetivo_objetivo:
+        # Subjetivo and Objetivo only consume the transcript (see
+        # _section_prompt_placeholders) — no cross-dependency — so they can run
+        # concurrently. Both futures are submitted before either is awaited so
+        # they truly overlap; .result() is still resolved in SOAP_SECTIONS order
+        # so a subjetivo failure keeps taking priority over an objetivo failure,
+        # matching the sequential behavior this replaces.
+        with ThreadPoolExecutor(max_workers=len(parallel_specs)) as executor:
+            futures = {spec.section_id: executor.submit(run_section, spec) for spec in parallel_specs}
+            for spec in parallel_specs:
+                early_return = apply_result(spec, futures[spec.section_id].result())
+                if early_return is not None:
+                    return early_return
+    else:
+        for spec in parallel_specs:
+            early_return = apply_result(spec, run_section(spec))
+            if early_return is not None:
+                return early_return
+
+    for spec in sequential_specs:
+        early_return = apply_result(spec, run_section(spec))
+        if early_return is not None:
+            return early_return
 
     document = merge_soap_sections(
         subjetivo=partials["subjetivo"],
@@ -1295,6 +1337,7 @@ def generate_soap_draft(
     timeout: int = 600,
     max_retries: int = 0,
     prompt_compact: bool = False,
+    parallel_subjetivo_objetivo: bool = False,
 ) -> dict[str, Any]:
     segmented_transcript = resolve_soap_input_transcript(
         text,
@@ -1364,6 +1407,7 @@ def generate_soap_draft(
                 timeout=timeout,
                 max_retries=max_retries,
                 prompt_compact=prompt_compact,
+                parallel_subjetivo_objetivo=parallel_subjetivo_objetivo,
             )
         else:
             if tracker:
@@ -1406,6 +1450,7 @@ def generate_soap_draft(
                     timeout=timeout,
                     max_retries=max_retries,
                     prompt_compact=prompt_compact,
+                    parallel_subjetivo_objetivo=parallel_subjetivo_objetivo,
                 )
                 result["split_fallback"] = True
     except Exception as exc:
@@ -1451,6 +1496,9 @@ def generate_soap_draft_from_config(
     tracker: PipelineTracker | None = None,
 ) -> dict[str, Any]:
     split_enabled = str(config.get("SOAP_SPLIT_ENABLED", "true")).lower() in {"true", "1", "yes"}
+    parallel_subjetivo_objetivo = str(
+        config.get("SOAP_PARALLEL_SUBJETIVO_OBJETIVO", "false")
+    ).lower() in {"true", "1", "yes"}
     prompt_compact = prompt_compact_for_config(config)
     prompts_dir = _config_path(config, "SOAP_PROMPTS_DIR", "benchmarks/prompts")
     prompt_path = _config_path(config, "SOAP_DRAFT_PROMPT_PATH", "benchmarks/prompts/soap-draft.md")
@@ -1478,6 +1526,7 @@ def generate_soap_draft_from_config(
         timeout=int(llm["timeout"]),
         max_retries=int(llm["soap_max_retries"]),
         prompt_compact=prompt_compact,
+        parallel_subjetivo_objetivo=parallel_subjetivo_objetivo,
     )
     document = result.get("document")
     if isinstance(document, dict):

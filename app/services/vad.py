@@ -9,10 +9,19 @@ from app.services.normalize import CHANNELS, SAMPLE_RATE, SAMPLE_WIDTH
 
 _model = None
 
+
 def _get_model():
     global _model
     if _model is None:
-        _model = load_silero_vad()
+        # ONNX Runtime backend, not the TorchScript default: get_speech_timestamps
+        # calls the model once per 32ms window (~25k calls for a 13min file), so
+        # per-call dispatch overhead dominates — ONNX Runtime's is much lower than
+        # TorchScript's. Measured ~2.2x faster on the same audio with byte-identical
+        # speech-timestamp output (same weights, different runtime). silero_vad
+        # hardcodes CPU-only execution for this path (no GPU option here) — which
+        # matches what we separately measured for the TorchScript backend too: CUDA
+        # was ~15-18% *slower* than CPU for this tiny-model/many-small-calls shape.
+        _model = load_silero_vad(onnx=True)
     return _model
 
 

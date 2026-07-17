@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import difflib
+import json
 import re
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -54,6 +55,13 @@ _EDITOR_ROLE_PREAMBLE_RE = re.compile(
     re.I | re.S,
 )
 _SPEAKER_LINE_RE = re.compile(r"^(?:Falante\s+\d+|SPEAKER_\d+)\s*:", re.IGNORECASE)
+_FALANTE_1_RE = re.compile(r"^Falante\s+1\s*:", re.IGNORECASE)
+_FALANTE_2_RE = re.compile(r"^Falante\s+2\s*:", re.IGNORECASE)
+
+DEFAULT_DIARIZATION_LABEL_SAMPLE_RATIO = 0.15
+DIARIZATION_LABEL_SAMPLE_RATIO_CAP = 0.30
+DIARIZATION_LABEL_SAMPLE_MIN_LINES = 20
+DIARIZATION_LABEL_VALID_ROLES = {"Médico", "Paciente"}
 
 
 def _editor_prompt_source_path(
@@ -388,24 +396,103 @@ def _build_asr_user_message(
     return "\n".join(parts)
 
 
-def _build_diarization_label_user_message(text: str, *, prompt_compact: bool = False) -> str:
+def _sample_for_diarization_labels(
+    text: str,
+    *,
+    ratio: float = DEFAULT_DIARIZATION_LABEL_SAMPLE_RATIO,
+    ratio_cap: float = DIARIZATION_LABEL_SAMPLE_RATIO_CAP,
+    min_lines: int = DIARIZATION_LABEL_SAMPLE_MIN_LINES,
+) -> str:
+    """First ~ratio of the transcript (by line count) — enough for the LLM to see both
+    speakers and classify roles, without sending the whole transcript. Extends up to
+    ratio_cap if the initial slice doesn't contain both Falante 1: and Falante 2: lines
+    (e.g. one speaker doesn't talk until later). Transcripts at or under min_lines are
+    returned whole — too short for percentage-based sampling to matter."""
+    lines = text.splitlines()
+    total = len(lines)
+    if total <= min_lines:
+        return text
+
+    def _has_both(count: int) -> bool:
+        subset = lines[:count]
+        has_1 = any(_FALANTE_1_RE.match(line.strip()) for line in subset)
+        has_2 = any(_FALANTE_2_RE.match(line.strip()) for line in subset)
+        return has_1 and has_2
+
+    cap = max(min_lines, round(total * ratio_cap))
+    step = max(1, round(total * 0.05))
+    n = max(min_lines, round(total * ratio))
+
+    while n < cap and not _has_both(n):
+        n += step
+
+    return "\n".join(lines[: min(n, cap, total)])
+
+
+def _parse_diarization_label_mapping(raw: str) -> dict[str, str] | None:
+    try:
+        data = json.loads(raw.strip())
+    except (ValueError, TypeError):
+        return None
+    if not isinstance(data, dict):
+        return None
+
+    falante_1 = str(data.get("falante_1", "")).strip()
+    falante_2 = str(data.get("falante_2", "")).strip()
+    if falante_1 not in DIARIZATION_LABEL_VALID_ROLES:
+        return None
+    if falante_2 not in DIARIZATION_LABEL_VALID_ROLES:
+        return None
+    if falante_1 == falante_2:
+        return None
+
+    return {"Falante 1": falante_1, "Falante 2": falante_2}
+
+
+def _apply_diarization_label_mapping(text: str, mapping: dict[str, str]) -> str:
+    out_lines: list[str] = []
+    for line in text.splitlines():
+        if _FALANTE_1_RE.match(line):
+            rest = _FALANTE_1_RE.sub("", line, count=1).lstrip()
+            out_lines.append(f"{mapping['Falante 1']}: {rest}")
+        elif _FALANTE_2_RE.match(line):
+            rest = _FALANTE_2_RE.sub("", line, count=1).lstrip()
+            out_lines.append(f"{mapping['Falante 2']}: {rest}")
+        else:
+            out_lines.append(line)
+    return "\n".join(out_lines)
+
+
+def apply_diarization_label_mapping_to_segments(
+    segments: list[dict[str, Any]], mapping: dict[str, str]
+) -> list[dict[str, Any]]:
+    """Rewrite each segment's speaker_label with the same Falante→role mapping applied to
+    the flat transcript text (label_diarized_transcript), so the per-segment view (frontend
+    transcript panel) and the merged text (SOAP) never disagree on who's who."""
+    return [
+        {**segment, "speaker_label": mapping.get(segment.get("speaker_label"), segment.get("speaker_label"))}
+        for segment in segments
+    ]
+
+
+def _build_diarization_label_user_message(sample_text: str, *, prompt_compact: bool = False) -> str:
     if prompt_compact:
         return "\n".join(
             [
-                "Assign Médico:/Paciente: roles and split mixed speaker lines per your rules.",
-                text.strip(),
+                "Identify which Falante is Médico and which is Paciente. Reply with the JSON only.",
+                sample_text.strip(),
             ]
         )
     parts = [
-        "The transcript below was ASR-corrected and still uses Falante 1: / Falante 2: labels.",
-        "Assign Médico: / Paciente: roles and split mixed speaker lines per your rules.",
-        "Do not change wording except when words move with a split span.",
+        "The excerpt below is a SAMPLE from the start of a diarized transcript — not the whole "
+        "consultation, just enough to tell who is who. Lines still use Falante 1: / Falante 2: labels.",
+        "Decide which Falante is Médico and which is Paciente per your rules.",
         "",
-        "TRANSCRIÇÃO:",
+        "TRECHO:",
         "<<<",
-        text.strip(),
+        sample_text.strip(),
         ">>>",
-        "FIM DA TRANSCRIÇÃO.",
+        "FIM DO TRECHO.",
     ]
     return "\n".join(parts)
 
@@ -1006,26 +1093,27 @@ def label_diarized_transcript(
         return result
 
     resolved_prompt_path = (prompt_path or DEFAULT_DIARIZATION_LABEL_PROMPT_PATH).resolve()
+    sample = _sample_for_diarization_labels(text)
     try:
         instructions = _finalize_postprocess_instructions(
             system_prompt or load_diarization_label_prompt(prompt_path=prompt_path),
             prompt_compact=prompt_compact,
         )
-        task_message = _build_diarization_label_user_message(text, prompt_compact=prompt_compact)
+        task_message = _build_diarization_label_user_message(sample, prompt_compact=prompt_compact)
         user_prompt = compose_asr_user_prompt(
             instructions,
             task_message,
             prompt_compact=prompt_compact,
         )
         llm_system_prompt = resolve_diarization_label_system_prompt()
-        labeled, llm_raw = medgemma_generate(
+        mapping_raw, llm_raw = medgemma_generate(
             prompt=user_prompt,
             system_prompt=llm_system_prompt,
             model=model,
             base_url=base_url.rstrip("/"),
             api_key=api_key,
             temperature=temperature,
-            force_json=False,
+            force_json=True,
             timeout=timeout,
             return_raw=True,
             tracker=tracker,
@@ -1033,14 +1121,25 @@ def label_diarized_transcript(
             tracker_request_meta={
                 "prompt_path": str(resolved_prompt_path),
                 "prompt_compact": prompt_compact,
+                "sample_chars": len(sample),
+                "full_text_chars": len(text),
             },
         )
     except Exception as exc:
         result["error"] = str(exc)
         return result
 
+    mapping = _parse_diarization_label_mapping(mapping_raw)
+    if mapping is None:
+        result["error"] = "invalid_llm_mapping_response"
+        result["llm_raw"] = llm_raw
+        return result
+
+    labeled = _apply_diarization_label_mapping(text, mapping)
+
     result["text"] = labeled
     result["llm_raw"] = llm_raw
+    result["mapping"] = mapping
     result["skipped"] = False
     result["diff"] = summarize_text_diff(text, labeled)
     return result
