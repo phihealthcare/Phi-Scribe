@@ -1,17 +1,27 @@
 from __future__ import annotations
 
 import json
+import logging
 import re
 import time
 import urllib.error
 import urllib.request
+from datetime import datetime, timezone
 from typing import TYPE_CHECKING, Any, Mapping
 
 if TYPE_CHECKING:
     from app.services.pipeline_tracker import PipelineTracker
 
+logger = logging.getLogger(__name__)
+
 DEFAULT_LLM_BASE_URL = "https://api.phihc.com"
 DEFAULT_LLM_PATH = "/api/medgemma"
+
+# Bounds a fire-and-forget warm-up ping — comfortably above the ~10s worst-case
+# cold start observed on api.phihc.com, but short enough not to leave a stray
+# thread hanging around if the backend is unreachable.
+WARMUP_TIMEOUT_SECONDS = 30
+WARMUP_PROMPT = "Responda apenas: ok"
 
 # Guards against a stuck/degenerate generation (observed: model looped on a
 # repeated token pattern for 837s and 245KB before the response ever stopped).
@@ -102,6 +112,53 @@ def resolve_llm_settings(config: Mapping[str, Any]) -> dict[str, Any]:
         "asr_fix_max_retries": _resolve_int_config(config, "LLM_ASR_FIX_MAX_RETRIES", 2),
         "soap_max_retries": _resolve_int_config(config, "LLM_SOAP_MAX_RETRIES", 0),
     }
+
+
+def warm_up_llm(config: Mapping[str, Any], tracker: PipelineTracker | None = None) -> None:
+    """Fire a tiny throwaway prompt to pay the LLM backend's cold-start cost
+    early. Meant to run in a background thread alongside diarization/Whisper
+    (~17s) so the first real LLM call (transcribe_04b) doesn't pay it —
+    confirmed empirically that this backend takes ~4-10s on a cold call vs.
+    ~400-600ms once warm, regardless of prompt size. Best-effort: never
+    raises, not part of the tracked pipeline steps (no `tracker_step_id` is
+    passed, so it never touches PIPELINE_STEPS/manifest.json — it only
+    appends to llm_requests.json, tagged via `meta`, when a tracker is given,
+    so its start/end timestamps can be compared against
+    transcribe_01_diarization/transcribe_02_whisper's to see the overlap).
+    """
+    started_at = datetime.now(timezone.utc)
+    started = time.perf_counter()
+    try:
+        llm = resolve_llm_settings(config)
+        if not llm["api_key"]:
+            logger.info("[llm-warmup] skipped: no LLM_API_KEY configured")
+            return
+        logger.info(
+            "[llm-warmup] starting at %s — runs concurrently with diarization+Whisper",
+            started_at.isoformat(),
+        )
+        medgemma_generate(
+            prompt=WARMUP_PROMPT,
+            model=llm["model"],
+            base_url=llm["base_url"],
+            api_key=llm["api_key"],
+            temperature=0,
+            force_json=False,
+            timeout=WARMUP_TIMEOUT_SECONDS,
+            max_retries=0,
+            tracker=tracker,
+            tracker_request_meta={
+                "kind": "warmup",
+                "started_at": started_at.isoformat(),
+                "note": (
+                    "fired at the start of /transcribe; runs concurrently with "
+                    "transcribe_01_diarization + transcribe_02_whisper, not a tracked step"
+                ),
+            },
+        )
+        logger.info("[llm-warmup] warm in %.0fms", (time.perf_counter() - started) * 1000)
+    except Exception as exc:
+        logger.info("[llm-warmup] failed after %.0fms: %s", (time.perf_counter() - started) * 1000, exc)
 
 
 def _split_messages(messages: list[dict[str, str]]) -> tuple[str, str]:

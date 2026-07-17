@@ -283,6 +283,15 @@ class Config:
     SOAP_PARALLEL_SUBJETIVO_OBJETIVO = os.environ.get(
         "SOAP_PARALLEL_SUBJETIVO_OBJETIVO", "false"
     ).lower() in {"true", "1", "yes"}
+    # Fire a tiny throwaway LLM prompt in the background as soon as /transcribe
+    # starts, concurrently with diarization+Whisper (~17s) — pays the backend's
+    # cold-start cost (confirmed ~4-10s on the first call vs ~400-600ms once
+    # warm) before the first real LLM call (transcribe_04b) needs it.
+    LLM_WARMUP_ENABLED = os.environ.get("LLM_WARMUP_ENABLED", "true").lower() in {
+        "true",
+        "1",
+        "yes",
+    }
     SOAP_PATIENT_CHART_CONTEXT = os.environ.get("SOAP_PATIENT_CHART_CONTEXT", "").strip()
     SOAP_PATIENT_CHART_FILE = os.environ.get("SOAP_PATIENT_CHART_FILE", "").strip()
     PIPELINE_DEBUG_LOG_ENABLED = os.environ.get("PIPELINE_DEBUG_LOG_ENABLED", "false").lower() in {

@@ -1,6 +1,7 @@
 import json
 import logging
 import tempfile
+import threading
 import time
 import uuid
 from contextlib import nullcontext
@@ -23,6 +24,7 @@ from app.services.pipeline_steps import (
     soap_enabled_for_config,
     soap_split_enabled_for_config,
 )
+from app.services.llm_client import warm_up_llm
 from app.services.pipeline_tracker import tracker_from_config
 from app.services.transcribe_diarized import (
     diarization_options_from_mapping,
@@ -131,6 +133,12 @@ def _run_transcription(audio_path: Path, *, file_id: str, preprocessing: str) ->
     transcribe_kwargs = transcribe.transcribe_options_from_mapping(config)
     diarization_opts = diarization_options_from_mapping(config)
     diarization_enabled = bool(diarization_opts.get("enabled"))
+
+    if bool(config.get("TRANSCRIPT_POSTPROCESS_ENABLED")) and bool(config.get("LLM_WARMUP_ENABLED", True)):
+        # Fire-and-forget: pays the LLM backend's cold-start cost concurrently
+        # with diarization+Whisper below (~17s), well before the first real
+        # LLM call (transcribe_04b) needs it. See app/services/llm_client.py.
+        threading.Thread(target=warm_up_llm, args=(config, tracker), daemon=True).start()
 
     transcribe_path, temp_wav_path = _prepare_transcription_audio(audio_path)
     try:
