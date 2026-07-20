@@ -1,0 +1,43 @@
+services:
+  backend:
+    build: .
+    env_file:
+      - .env
+    ports:
+      - "5000:5000"
+    volumes:
+      - uploads:/app/uploads
+      # Sortformer's model weights (nvidia/diar_sortformer_4spk-v1, several
+      # GB) get cached here on first use — without this volume, every
+      # `docker compose up --build` / container recreate re-downloads them.
+      - nemo_cache:/home/appuser/.cache
+    # Requires the NVIDIA Container Toolkit on the host (or GPU-node image,
+    # in the cloud) — https://github.com/NVIDIA/nvidia-container-toolkit.
+    # Remove this block (and set WHISPER_FASTER_DEVICE=cpu /
+    # SORTFORMER_DEVICE=cpu in .env) to run CPU-only.
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        # Same-origin via the frontend's own nginx proxy (see nginx.conf) —
+        # override only if the API is served from a different origin.
+        VITE_API_BASE_URL: /api/v1/audio
+        VITE_USE_MOCK: "false"
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+    restart: unless-stopped
+
+volumes:
+  uploads:
+  nemo_cache:

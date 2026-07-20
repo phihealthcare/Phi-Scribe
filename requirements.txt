@@ -1,6 +1,7 @@
 flask>=3.0.0
 flask-cors>=4.0.0
 python-dotenv>=1.0.0
+gunicorn>=22.0.0
 pyyaml>=6.0.0
 noisereduce>=3.0.0
 numpy>=1.26.0
@@ -13,7 +14,11 @@ torch>=2.0.0
 # Optional: local stack testing only (not for production)
 faster-whisper>=1.0.0
 # LLM transcript post-edit uses stdlib HTTP against PhiHC /api/medgemma
-# Optional: speaker diarization (DIARIZATION_ENABLED=true; requires HF_TOKEN)
-pyannote.audio>=3.1.0
+# Speaker diarization backend (DIARIZATION_ENABLED=true, DIARIZATION_BACKEND=sortformer).
+# nemo_toolkit previously required its own isolated venv because it conflicted
+# with pyannote.audio (protobuf/onnx version clash) — now that pyannote.audio
+# is no longer a dependency, it installs directly here. See
+# app/services/diarization_sortformer.py.
+nemo_toolkit[asr]
 # Required for WHISPER_FASTER_DEVICE=cuda when torch (CUDA 13) is also installed
 nvidia-cublas-cu12

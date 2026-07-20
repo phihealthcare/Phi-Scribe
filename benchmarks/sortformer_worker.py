@@ -1,15 +1,14 @@
 #!/usr/bin/env python3
 """Standalone Sortformer (nvidia/diar_sortformer_4spk-v1) diarization worker.
 
-Runs in its OWN virtualenv (.venv-sortformer/), completely isolated from the
-main project's dependencies. Installing NeMo in the main venv breaks
-pyannote.audio (confirmed: protobuf/onnx version conflict) — this script is
-the boundary that keeps that risk contained. See
-app/services/diarization_sortformer.py for the subprocess bridge that calls
-this from the main app.
+Run as a subprocess (see app/services/diarization_sortformer.py) rather than
+imported in-process, so the persistent daemon (sortformer_daemon.py) can keep
+NeMo/the model loaded independently of the main app's process lifecycle.
+nemo_toolkit lives in the same environment as the rest of the app
+(requirements.txt) — no separate virtualenv needed.
 
 Usage:
-    .venv-sortformer/bin/python benchmarks/sortformer_worker.py <wav_path> [<wav_path> ...] \
+    python3 benchmarks/sortformer_worker.py <wav_path> [<wav_path> ...] \
         [--max-duration-s 300] [--device cuda] [--min-turn-ms 0] [--batch-size 1]
 
 Accepts one or more WAV paths (chunking a long recording into several shorter

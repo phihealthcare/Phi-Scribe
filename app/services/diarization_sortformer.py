@@ -1,17 +1,23 @@
 """Sortformer (nvidia/diar_sortformer_4spk-v1) diarization backend — an
 alternative to app/services/diarization.py's pyannote pipeline.
 
-This module deliberately does NOT import nemo/torch-for-nemo at all. NeMo's
-dependency tree conflicts with pyannote.audio when installed in the same
-environment (confirmed: downgrades protobuf/pyannote-core/etc. and breaks
-pyannote imports with a protobuf/onnx version mismatch). To keep pyannote
-safe, Sortformer runs as a subprocess in its own virtualenv
-(.venv-sortformer/, see benchmarks/sortformer_worker.py) — this file is just
-the bridge that shells out and parses the result.
+This module deliberately does NOT import nemo/torch-for-nemo at all — it runs
+Sortformer as a subprocess (see benchmarks/sortformer_worker.py) instead of
+importing it in-process. That used to be required for dependency isolation:
+NeMo's dependency tree conflicted with pyannote.audio when installed in the
+same environment (confirmed: downgraded protobuf/pyannote-core/etc. and broke
+pyannote imports with a protobuf/onnx version mismatch). pyannote.audio has
+since been removed as a dependency, so nemo_toolkit now installs straight
+into the same environment as the rest of the app (see requirements.txt) —
+the subprocess split is kept anyway since sortformer_daemon.py's persistent
+worker (keeps the model loaded in GPU memory across requests) depends on it.
+DEFAULT_VENV_PYTHON below is therefore just sys.executable — the same
+interpreter running this process — with SORTFORMER_VENV_PYTHON (app/config.py)
+as an escape hatch if you ever do want a separate environment again.
 
 Removing this backend: delete this file, benchmarks/sortformer_worker.py,
-.venv-sortformer/, and the DIARIZATION_BACKEND/SORTFORMER_* config block.
-Nothing else in the codebase references any of that.
+benchmarks/sortformer_daemon.py, and the DIARIZATION_BACKEND/SORTFORMER_*
+config block. Nothing else in the codebase references any of that.
 """
 from __future__ import annotations
 
@@ -30,7 +36,7 @@ from typing import Any
 from app.services import diarization
 
 ROOT = Path(__file__).resolve().parents[2]
-DEFAULT_VENV_PYTHON = ROOT / ".venv-sortformer" / "bin" / "python"
+DEFAULT_VENV_PYTHON = Path(sys.executable)
 WORKER_SCRIPT = ROOT / "benchmarks" / "sortformer_worker.py"
 DAEMON_SCRIPT = ROOT / "benchmarks" / "sortformer_daemon.py"
 DEFAULT_MODEL_ID = "nvidia/diar_sortformer_4spk-v1"
@@ -39,12 +45,17 @@ DEFAULT_CHUNK_S = 240.0
 DEFAULT_CHUNK_OVERLAP_S = 20.0
 
 # Persistent-daemon settings (see sortformer_daemon.py). Keeping NeMo imported
-# and the model loaded in GPU memory across requests avoids paying the ~4s
-# import + ~1.6s model-load cost on every single diarization call — measured
-# to be the dominant fixed cost, well above anything WAV I/O or batching could
-# shave off. If the daemon can't be started/reached for any reason, callers
+# and the model loaded in GPU memory across requests avoids paying the NeMo
+# import + model-load cost on every single diarization call — measured to be
+# the dominant fixed cost, well above anything WAV I/O or batching could shave
+# off. If the daemon can't be started/reached for any reason, callers
 # transparently fall back to the one-shot sortformer_worker.py subprocess.
-DAEMON_STARTUP_TIMEOUT_S = 60.0
+#
+# NeMo's own import (megatron/apex-adjacent registry setup, before any model
+# loading happens) took ~69s in Docker — startup timeout needs real margin
+# above that or the daemon "loses the race" against its own timeout on every
+# cold start and always falls back to the slower one-shot path.
+DAEMON_STARTUP_TIMEOUT_S = 150.0
 DAEMON_IDLE_TIMEOUT_S = 1800.0
 DAEMON_POLL_INTERVAL_S = 0.2
 
@@ -84,8 +95,9 @@ def _run_worker(
     python_bin = Path(venv_python) if venv_python else DEFAULT_VENV_PYTHON
     if not python_bin.is_file():
         raise RuntimeError(
-            f"Sortformer venv not found at {python_bin}. Create it with: "
-            f"python3 -m venv .venv-sortformer && .venv-sortformer/bin/pip install nemo_toolkit[asr]"
+            f"Sortformer interpreter not found at {python_bin}. Install with: "
+            f"pip install 'nemo_toolkit[asr]' (same environment as requirements.txt), "
+            f"or set SORTFORMER_VENV_PYTHON to point at a different interpreter."
         )
     if not WORKER_SCRIPT.is_file():
         raise RuntimeError(f"Sortformer worker script not found: {WORKER_SCRIPT}")
@@ -145,7 +157,7 @@ def _daemon_is_alive(socket_path: Path) -> bool:
 def _start_daemon(socket_path: Path, *, model_id: str, device: str, venv_python: Path | str | None) -> None:
     python_bin = Path(venv_python) if venv_python else DEFAULT_VENV_PYTHON
     if not python_bin.is_file():
-        raise RuntimeError(f"Sortformer venv not found at {python_bin}")
+        raise RuntimeError(f"Sortformer interpreter not found at {python_bin}")
     if not DAEMON_SCRIPT.is_file():
         raise RuntimeError(f"Sortformer daemon script not found: {DAEMON_SCRIPT}")
 

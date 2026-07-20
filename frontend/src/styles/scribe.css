@@ -4,19 +4,45 @@
  */
 
 :root {
-  --scribe-bg: #f5f6f8;
+  --scribe-bg: #f8f2f9; /* PHI --purple-tint */
   --scribe-surface: #ffffff;
-  --scribe-border: #e5e7eb;
-  --scribe-text-muted: #6b7280;
-  --scribe-primary: #1a5c4a;
-  --scribe-primary-hover: #144839;
-  --scribe-accent-teal: #0f766e;
-  --scribe-accent-orange: #d97706;
+  --scribe-border: #e4e4e7;
+  --scribe-text-muted: #52525b;
+  --scribe-primary: #621266;
+  --scribe-primary-hover: #3d0b40;
+  --scribe-speaker-medico: #3d0b40; /* PHI --purple-dark — higher contrast vs. --scribe-speaker-paciente */
+  --scribe-speaker-paciente: #a64dab;
   --scribe-recording: #dc2626;
+  --scribe-font-heading: "Fraunces", Georgia, serif;
+  --scribe-font-body: "Plus Jakarta Sans", system-ui, sans-serif;
 }
 
 body {
   background-color: var(--scribe-bg);
+  font-family: var(--scribe-font-body);
+}
+
+/* Bootstrap 5.3's compiled CSS sets .btn-primary's colors as local --bs-btn-*
+   custom properties (not indirected through a single global token), so a
+   root-level override alone doesn't reach it — override the component
+   classes directly. Covers ConfirmModal.tsx's confirmVariant="primary" /
+   default extraVariant="outline-primary". */
+.btn-primary {
+  --bs-btn-bg: var(--scribe-primary);
+  --bs-btn-border-color: var(--scribe-primary);
+  --bs-btn-hover-bg: var(--scribe-primary-hover);
+  --bs-btn-hover-border-color: var(--scribe-primary-hover);
+  --bs-btn-active-bg: var(--scribe-primary-hover);
+  --bs-btn-active-border-color: var(--scribe-primary-hover);
+}
+
+.btn-outline-primary {
+  --bs-btn-color: var(--scribe-primary);
+  --bs-btn-border-color: var(--scribe-primary);
+  --bs-btn-hover-bg: var(--scribe-primary);
+  --bs-btn-hover-border-color: var(--scribe-primary);
+  --bs-btn-active-bg: var(--scribe-primary);
+  --bs-btn-active-border-color: var(--scribe-primary);
 }
 
 .scribe-layout {
@@ -94,6 +120,7 @@ body {
 }
 
 .scribe-card-title {
+  font-family: var(--scribe-font-heading);
   font-size: 0.95rem;
   font-weight: 600;
   margin-bottom: 1rem;
@@ -110,7 +137,7 @@ body {
 
 .scribe-vu-bar {
   flex: 1;
-  background-color: var(--scribe-accent-teal);
+  background-color: var(--scribe-speaker-medico);
   opacity: 0.35;
   border-radius: 2px;
 }
@@ -225,19 +252,19 @@ body {
 }
 
 .scribe-speaker-medico .scribe-segment-bar {
-  background-color: var(--scribe-accent-teal);
+  background-color: var(--scribe-speaker-medico);
 }
 
 .scribe-speaker-medico .scribe-segment-speaker {
-  color: var(--scribe-accent-teal);
+  color: var(--scribe-speaker-medico);
 }
 
 .scribe-speaker-paciente .scribe-segment-bar {
-  background-color: var(--scribe-accent-orange);
+  background-color: var(--scribe-speaker-paciente);
 }
 
 .scribe-speaker-paciente .scribe-segment-speaker {
-  color: var(--scribe-accent-orange);
+  color: var(--scribe-speaker-paciente);
 }
 
 .scribe-speaker-outro .scribe-segment-bar {

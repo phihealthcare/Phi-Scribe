@@ -4,9 +4,10 @@
 Keeps NeMo imported and the model loaded in GPU memory across many
 diarization requests, instead of paying the ~4s NeMo import + ~1.6s model
 load cost on every single call (as the one-shot benchmarks/sortformer_worker.py
-does, invoked fresh per request). Runs in the isolated .venv-sortformer/ venv
-for the same reason sortformer_worker.py does — NeMo conflicts with
-pyannote.audio if installed in the main venv.
+does, invoked fresh per request). Runs as a subprocess, independent of the
+main app's process lifecycle, so the loaded model survives app
+restarts/reloads. nemo_toolkit lives in the same environment as the rest of
+the app (requirements.txt) — no separate virtualenv needed.
 
 Listens on a Unix domain socket, one request per connection. See
 app/services/diarization_sortformer.py (_ensure_daemon, _daemon_request) for
@@ -20,7 +21,7 @@ Wire protocol: 4-byte big-endian length prefix + UTF-8 JSON, both directions.
               or {"error": "..."}
 
 Usage:
-    .venv-sortformer/bin/python benchmarks/sortformer_daemon.py \
+    python3 benchmarks/sortformer_daemon.py \
         --socket /tmp/phi-scribe-sortformer-<key>.sock \
         --model-id nvidia/diar_sortformer_4spk-v1 --device cuda \
         [--idle-timeout-s 1800]
