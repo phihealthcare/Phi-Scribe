@@ -232,22 +232,62 @@ VAD is optional and should be validated so clinically relevant speech is not rem
 ## Setup
 
 ```bash
-python3 -m venv .venv
+python3.12 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
 cp .env.example .env
 python run.py
 ```
 
-`faster-whisper`, `torch`, and `nvidia-cublas-cu12` are already included in `requirements.txt` — no separate install step needed.
+**Use Python 3.12** (3.13 also works), not whatever `python3` defaults to on a newer system, and not older either — two constraints pull in opposite directions: `nemo_toolkit[asr]`'s dependency resolution forces an older `numba` that has no prebuilt wheel for 3.14 and refuses to build from source on it (`Cannot install on Python version 3.14; only versions >=3.10,<3.14 are supported`), while `app/services/soap_draft.py` uses a multi-line f-string expression that's a `SyntaxError` on 3.11 and below (needs PEP 701's relaxed f-string grammar, Python 3.12+). The Docker image (below) is pinned to `python:3.12-slim` for the same reasons — if your existing local `.venv` was created with a different Python version, recreate it with 3.12 before running `pip install -r requirements.txt`.
+
+`faster-whisper`, `torch`, `nemo_toolkit[asr]` (Sortformer diarization), and `nvidia-cublas-cu12` are already included in `requirements.txt` — no separate install step needed, and no separate virtualenv either (see below).
 
 For **GPU** (`WHISPER_FASTER_DEVICE=cuda`), `nvidia-cublas-cu12` is needed because `faster-whisper` uses CUDA 12 libraries while PyTorch (Silero VAD) uses CUDA 13. Without it you may see: `Library libcublas.so.12 is not found`.
 
 Production will use the **OpenAI Whisper API** wired to our LLM. `faster-whisper` is decoupled and only used to evaluate preprocessing stacks locally.
 
-**System dependency:** `ffmpeg` (audio conversion).
+**System dependency:** `ffmpeg` (audio conversion). Sortformer (below) additionally needs `sox`.
 
 **Sortformer diarization backend:** speaker diarization (`DIARIZATION_ENABLED=true`) uses NVIDIA NeMo Sortformer (`nvidia/diar_sortformer_4spk-v1`), run via `benchmarks/sortformer_worker.py`/`benchmarks/sortformer_daemon.py` in a separate OS subprocess of the same interpreter running Flask (for GPU-memory eviction and crash isolation, not dependency isolation — `nemo_toolkit[asr]` and its pinned `onnx`/`ml_dtypes`/`protobuf`/`numpy` versions are already in `requirements.txt`; no separate venv needed).
+**Diarization backend:** [NVIDIA NeMo Sortformer](https://huggingface.co/nvidia/diar_sortformer_4spk-v1) (`DIARIZATION_BACKEND=sortformer`, the only backend now — `pyannote.audio` has been removed). It runs via subprocess (`benchmarks/sortformer_worker.py` / `sortformer_daemon.py`, see `app/services/diarization_sortformer.py`) but **in the same `.venv`** as everything else — that subprocess design used to exist so `nemo_toolkit` could be isolated in its own `.venv-sortformer/` away from `pyannote.audio`'s conflicting dependencies (protobuf/onnx version clash). Now that `pyannote.audio` is gone, there's nothing left to conflict with, so `nemo_toolkit[asr]` just installs into the main `.venv`, and the subprocess defaults to `sys.executable` — the same interpreter running the Flask app — automatically, in both Docker and local dev. `SORTFORMER_VENV_PYTHON` only needs setting if you deliberately want a different interpreter.
+
+If you have a leftover `.venv-sortformer/` from before this change, it's no longer used and can be deleted.
+
+### Docker
+
+Runs the backend (Flask) and frontend (Vite build served by nginx, which
+proxies `/api/` to the backend so there's no cross-origin setup needed —
+CORS is only enabled when `FLASK_ENV=development`) as two containers:
+
+```bash
+cp .env.example .env   # fill in LLM_API_KEY, HF_TOKEN, etc.
+# .env.example defaults to FLASK_ENV=development; env_file in docker-compose.yml
+# overrides the image's own ENV, so set this explicitly for a real deployment:
+#   FLASK_ENV=production
+docker compose up --build
+```
+
+Frontend: `http://localhost` · Backend API: `http://localhost:5000/api/v1/audio`.
+
+**Sortformer model cache:** the backend's `nemo_cache` volume (`docker-compose.yml`) persists Sortformer's downloaded model weights (several GB) across container recreates — without it, every `docker compose up --build` would re-download them.
+
+**GPU:** `docker-compose.yml` requests a GPU for the backend by default
+(`WHISPER_FASTER_DEVICE=cuda` / `SORTFORMER_DEVICE=cuda` in `.env`). This
+needs the [NVIDIA Container Toolkit](https://github.com/NVIDIA/nvidia-container-toolkit)
+on the host — no CUDA toolkit is baked into the image; the `torch` wheel
+already bundles its own CUDA runtime, the toolkit just exposes the host GPU
+to the container. For CPU-only, delete the `deploy:` block in
+`docker-compose.yml` and set `WHISPER_FASTER_DEVICE=cpu` /
+`SORTFORMER_DEVICE=cpu` in `.env`.
+
+**Cloud deployment:** the two images (`Dockerfile` for the backend,
+`frontend/Dockerfile` for the frontend) are plain Docker images with no
+platform-specific dependencies, so they run on any container host that
+offers a GPU node — ECS/EC2, GKE, Lambda Labs, RunPod, etc. Push both images
+to a registry, run the backend on a GPU-enabled node (or `WHISPER_FASTER_DEVICE=cpu`
+without one), and point the frontend build's `VITE_API_BASE_URL` build arg
+at wherever the backend is reachable if it isn't behind the same nginx proxy.
 
 **Optional preprocessing variables** (`.env`):
 
