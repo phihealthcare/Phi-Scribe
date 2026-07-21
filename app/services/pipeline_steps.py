@@ -65,7 +65,7 @@ PIPELINE_STEPS: dict[str, dict[str, Any]] = {
     TRANSCRIBE_01_DIARIZATION: {
         "order": 5,
         "endpoint": "/transcribe",
-        "label": "Diarization using pyannote/speaker-diarization-min-med-v3",
+        "label": "Diarization using nvidia/diar_sortformer_4spk-v1 (NeMo Sortformer)",
     },
     TRANSCRIBE_02_WHISPER: {
         "order": 6,
@@ -90,7 +90,7 @@ PIPELINE_STEPS: dict[str, dict[str, Any]] = {
     TRANSCRIBE_04C_LLM_MANUAL_DIARIZATION: {
         "order": 10,
         "endpoint": "/transcribe",
-        "label": "LLM manual diarization (no pyannote) — split into Doutor/Paciente turns",
+        "label": "LLM manual diarization (no acoustic diarization model) — split into Doutor/Paciente turns",
     },
     TRANSCRIBE_05A_LLM_SOAP_SUBJETIVO: {
         "order": 11,

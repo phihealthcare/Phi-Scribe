@@ -1,10 +1,15 @@
 flask>=3.0.0
 flask-cors>=4.0.0
+# Live transcription+diarization WebSocket (REALTIME_TRANSCRIPTION_ENABLED=true)
+flask-sock>=0.7.0
 python-dotenv>=1.0.0
 gunicorn>=22.0.0
 pyyaml>=6.0.0
 noisereduce>=3.0.0
-numpy>=1.26.0
+# Pinned: numba (required by nemo_toolkit via librosa/resampy) hard-requires
+# numpy<2.5 at import time; leaving this unpinned lets pip's resolver drift
+# numpy to 2.5+ on a `pip install -U <other-package>` and silently break numba.
+numpy==2.4.6
 scipy>=1.11.0
 numba>=0.58.0
 pyloudnorm>=0.1.1
@@ -14,11 +19,18 @@ torch>=2.0.0
 # Optional: local stack testing only (not for production)
 faster-whisper>=1.0.0
 # LLM transcript post-edit uses stdlib HTTP against PhiHC /api/medgemma
-# Speaker diarization backend (DIARIZATION_ENABLED=true, DIARIZATION_BACKEND=sortformer).
-# nemo_toolkit previously required its own isolated venv because it conflicted
-# with pyannote.audio (protobuf/onnx version clash) — now that pyannote.audio
-# is no longer a dependency, it installs directly here. See
-# app/services/diarization_sortformer.py.
-nemo_toolkit[asr]
 # Required for WHISPER_FASTER_DEVICE=cuda when torch (CUDA 13) is also installed
 nvidia-cublas-cu12
+# Speaker diarization (DIARIZATION_ENABLED=true) — NVIDIA NeMo Sortformer.
+# Pinned trio below (onnx/ml_dtypes/protobuf) because nemo_toolkit's own
+# unconstrained "onnx" dep resolves to a version whose compiled protobuf
+# gencode needs protobuf>=6.31, while nemo_toolkit itself declares
+# protobuf~=5.29.5 — pip will flag that as a conflict (`pip check`), but the
+# newer protobuf runtime is backwards-compatible and this exact combination
+# is verified working. ml_dtypes is pinned because onnx 1.19.0's _mapping.py
+# references a dtype (float4_e2m1fn) only present in ml_dtypes>=0.5.x, whose
+# own wheel resolution otherwise drags numpy to 2.5+ (see numpy pin above).
+nemo_toolkit[asr]==2.5.0
+onnx==1.19.0
+ml_dtypes==0.5.4
+protobuf==7.35.1

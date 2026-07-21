@@ -5,7 +5,7 @@ import time
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Mapping
 
-from app.services import diarization, transcribe
+from app.services import transcribe, wav_utils
 from app.services.pipeline_steps import (
     TRANSCRIBE_01_DIARIZATION,
     TRANSCRIBE_02_WHISPER,
@@ -15,12 +15,12 @@ from app.services.pipeline_steps import (
 if TYPE_CHECKING:
     from app.services.pipeline_tracker import PipelineTracker
 
-def _speaker_label_map(speakers: list[str]) -> dict[str, str]:
+def speaker_label_map(speakers: list[str]) -> dict[str, str]:
     ordered = sorted(speakers)
     return {speaker_id: f"Falante {index + 1}" for index, speaker_id in enumerate(ordered)}
 
 
-def _format_speaker_transcript(segments: list[dict[str, Any]]) -> str:
+def format_speaker_transcript(segments: list[dict[str, Any]]) -> str:
     lines: list[str] = []
     for segment in segments:
         label = str(segment.get("speaker_label", "Falante"))
@@ -30,7 +30,7 @@ def _format_speaker_transcript(segments: list[dict[str, Any]]) -> str:
     return "\n".join(lines)
 
 
-def _speaker_for_ms(turns: list[dict[str, Any]], ms: int) -> str:
+def speaker_for_ms(turns: list[dict[str, Any]], ms: int) -> str:
     for turn in turns:
         start_ms = int(turn["start_ms"])
         end_ms = int(turn["end_ms"])
@@ -80,7 +80,7 @@ def _segments_from_aligned_words(
     segments: list[dict[str, Any]] = []
     for word in words:
         midpoint_ms = (word["start_ms"] + word["end_ms"]) // 2
-        speaker_id = _speaker_for_ms(alignment_turns, midpoint_ms)
+        speaker_id = speaker_for_ms(alignment_turns, midpoint_ms)
         speaker_label = speaker_label_mapping.get(speaker_id, speaker_id)
 
         if segments and segments[-1]["speaker_id"] == speaker_id:
@@ -120,7 +120,7 @@ def _transcribe_turns(
         tmp_path = Path(tmp_dir)
         for index, turn in enumerate(turns):
             turn_wav = tmp_path / f"turn_{index:04d}.wav"
-            diarization.extract_turn_wav(
+            wav_utils.extract_turn_wav(
                 wav_path,
                 turn_wav,
                 start_ms=int(turn["start_ms"]),
@@ -166,12 +166,7 @@ def diarization_options_from_mapping(mapping: Mapping[str, Any]) -> dict[str, An
 
     return {
         "enabled": _bool(_get("ENABLED", _get("enabled")), False),
-        "num_speakers": int(_get("NUM_SPEAKERS", _get("num_speakers", 2))),
         "min_turn_ms": int(_get("MIN_TURN_MS", _get("min_turn_ms", 400))),
-        "model_id": str(_get("MODEL", _get("model", "pyannote/speaker-diarization-community-1"))),
-        "hf_token": _get("HF_TOKEN", _get("hf_token")),
-        # Experimental alternative backend — see diarization_sortformer.py.
-        "backend": str(mapping.get("DIARIZATION_BACKEND", "pyannote")).strip().lower(),
         "sortformer_model_id": mapping.get("SORTFORMER_MODEL_ID", "nvidia/diar_sortformer_4spk-v1"),
         "sortformer_device": mapping.get("SORTFORMER_DEVICE", "cuda"),
         "sortformer_max_duration_s": float(mapping.get("SORTFORMER_MAX_DURATION_S", 300)),
@@ -192,33 +187,23 @@ def transcribe_wav_diarized(
     diar_opts = diarization_options or {}
     diarization_request = {
         "wav_path": wav_path,
-        "num_speakers": int(diar_opts.get("num_speakers", 2)),
         "min_turn_ms": int(diar_opts.get("min_turn_ms", 400)),
-        "model_id": str(diar_opts.get("model_id", "pyannote/speaker-diarization-community-1")),
+        "model_id": str(diar_opts.get("sortformer_model_id", "nvidia/diar_sortformer_4spk-v1")),
     }
     t0 = time.perf_counter()
-    if diar_opts.get("backend") == "sortformer":
-        from app.services.diarization_sortformer import diarize_wav_sortformer_chunked
+    from app.services.diarization_sortformer import diarize_wav_sortformer_chunked
 
-        diarization_result = diarize_wav_sortformer_chunked(
-            wav_path,
-            chunk_s=diar_opts.get("sortformer_chunk_s", 240.0),
-            overlap_s=diar_opts.get("sortformer_chunk_overlap_s", 20.0),
-            model_id=diar_opts.get("sortformer_model_id", "nvidia/diar_sortformer_4spk-v1"),
-            max_duration_s=diar_opts.get("sortformer_max_duration_s", 300.0),
-            device=diar_opts.get("sortformer_device", "cuda"),
-            min_turn_ms=diarization_request["min_turn_ms"],
-            venv_python=diar_opts.get("sortformer_venv_python"),
-            use_daemon=diar_opts.get("sortformer_use_daemon", True),
-        )
-    else:
-        diarization_result = diarization.diarize_wav(
-            wav_path,
-            num_speakers=diarization_request["num_speakers"],
-            min_turn_ms=diarization_request["min_turn_ms"],
-            model_id=diarization_request["model_id"],
-            hf_token=diar_opts.get("hf_token"),
-        )
+    diarization_result = diarize_wav_sortformer_chunked(
+        wav_path,
+        chunk_s=diar_opts.get("sortformer_chunk_s", 240.0),
+        overlap_s=diar_opts.get("sortformer_chunk_overlap_s", 20.0),
+        model_id=diar_opts.get("sortformer_model_id", "nvidia/diar_sortformer_4spk-v1"),
+        max_duration_s=diar_opts.get("sortformer_max_duration_s", 300.0),
+        device=diar_opts.get("sortformer_device", "cuda"),
+        min_turn_ms=diarization_request["min_turn_ms"],
+        venv_python=diar_opts.get("sortformer_venv_python"),
+        use_daemon=diar_opts.get("sortformer_use_daemon", True),
+    )
     if tracker:
         tracker.record(
             TRANSCRIBE_01_DIARIZATION,
@@ -256,7 +241,7 @@ def transcribe_wav_diarized(
         }
         return result
 
-    speaker_label_mapping = _speaker_label_map(diarization_result.get("speakers", []))
+    speaker_label_mapping = speaker_label_map(diarization_result.get("speakers", []))
     alignment_turns = diarization_result.get("alignment_turns") or turns
 
     # Respects the configured inference_mode (e.g. batched) instead of forcing
@@ -304,7 +289,7 @@ def transcribe_wav_diarized(
             speaker_label_mapping=speaker_label_mapping,
         )
 
-    labeled_text = _format_speaker_transcript(segments)
+    labeled_text = format_speaker_transcript(segments)
     plain_text = " ".join(str(segment.get("text", "")).strip() for segment in segments if segment.get("text"))
 
     if tracker:

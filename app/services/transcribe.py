@@ -1,4 +1,5 @@
 import os
+import threading
 from pathlib import Path
 from typing import Any
 
@@ -8,6 +9,12 @@ _model = None
 _model_key: tuple[str, str, str] | None = None
 _batched_pipeline = None
 _batched_pipeline_key: tuple[str, str, str] | None = None
+# Guards the check-then-create sections below. Not needed while only one
+# request ever runs Whisper inference at a time (today's single-threaded dev
+# server), but real-time streaming introduces genuine concurrency: two
+# threads racing on a cache-miss could otherwise both construct a
+# WhisperModel, double-allocating VRAM on an already-tight GPU budget.
+_model_lock = threading.Lock()
 
 # faster-whisper defaults (see WhisperModel.transcribe)
 DEFAULT_COMPRESSION_RATIO_THRESHOLD = 2.4
@@ -51,10 +58,11 @@ def _clear_cuda_memory() -> None:
 
 def _reset_model() -> None:
     global _model, _model_key, _batched_pipeline, _batched_pipeline_key
-    _model = None
-    _model_key = None
-    _batched_pipeline = None
-    _batched_pipeline_key = None
+    with _model_lock:
+        _model = None
+        _model_key = None
+        _batched_pipeline = None
+        _batched_pipeline_key = None
 
 
 def _is_cuda_oom(exc: BaseException) -> bool:
@@ -228,18 +236,18 @@ def _get_model(model_id: str, device: str, compute_type: str):
         from faster_whisper import WhisperModel
     except ImportError as exc:
         raise RuntimeError(
-            "faster-whisper is not installed. "
-            "Install with: pip install -r requirements-experimental.txt"
+            "faster-whisper is not installed. Install with: pip install -r requirements.txt"
         ) from exc
 
     resolved_compute_type = _resolve_compute_type(device, compute_type)
     key = (model_id, device, resolved_compute_type)
-    if _model is None or _model_key != key:
-        if device == "cuda":
-            enhance_deep.release_gpu_memory()
-            _clear_cuda_memory()
-        _model = WhisperModel(model_id, device=device, compute_type=resolved_compute_type)
-        _model_key = key
+    with _model_lock:
+        if _model is None or _model_key != key:
+            if device == "cuda":
+                enhance_deep.release_gpu_memory()
+                _clear_cuda_memory()
+            _model = WhisperModel(model_id, device=device, compute_type=resolved_compute_type)
+            _model_key = key
 
     return _model, resolved_compute_type
 
@@ -251,15 +259,18 @@ def _get_batched_pipeline(model_id: str, device: str, compute_type: str):
         from faster_whisper import BatchedInferencePipeline
     except ImportError as exc:
         raise RuntimeError(
-            "faster-whisper is not installed. "
-            "Install with: pip install -r requirements-experimental.txt"
+            "faster-whisper is not installed. Install with: pip install -r requirements.txt"
         ) from exc
 
+    # _get_model() acquires/releases _model_lock itself — call it before our
+    # own `with _model_lock:` below so the two acquisitions stay sequential,
+    # not nested (Lock() isn't reentrant).
     base_model, resolved_compute_type = _get_model(model_id, device, compute_type)
     key = (model_id, device, resolved_compute_type)
-    if _batched_pipeline is None or _batched_pipeline_key != key:
-        _batched_pipeline = BatchedInferencePipeline(model=base_model)
-        _batched_pipeline_key = key
+    with _model_lock:
+        if _batched_pipeline is None or _batched_pipeline_key != key:
+            _batched_pipeline = BatchedInferencePipeline(model=base_model)
+            _batched_pipeline_key = key
 
     return _batched_pipeline, resolved_compute_type
 

@@ -10,8 +10,14 @@ import StatusBanner, { hasStatusBanner } from "../components/status/StatusBanner
 import TranscriptPanel from "../components/transcript/TranscriptPanel";
 import { useAudioRecorder } from "../hooks/useAudioRecorder";
 import { useConsultationSession } from "../hooks/useConsultationSession";
+import { useRealtimeTranscription } from "../hooks/useRealtimeTranscription";
 import { MicError, blobToUploadFile } from "../lib/audioRecorder";
 import { formatSoapPlainText } from "../lib/soapText";
+
+// Live capture (AudioWorkletNode + WebSocket) instead of the batch
+// upload-then-transcribe flow. Requires the backend's own
+// REALTIME_TRANSCRIPTION_ENABLED=true too — see app/routes/realtime.py.
+const REALTIME_ENABLED = import.meta.env.VITE_REALTIME_TRANSCRIPTION_ENABLED === "true";
 
 export default function ConsultationPage() {
   const {
@@ -31,16 +37,35 @@ export default function ConsultationPage() {
     filteredSegments,
     uploadAndTranscribe,
     retryTranscribe,
+    applyRealtimeResult,
     dismissError,
     resetSession,
   } = useConsultationSession();
 
   const recorder = useAudioRecorder();
+  const realtime = useRealtimeTranscription();
 
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [showRefreshConfirm, setShowRefreshConfirm] = useState(false);
   const [showFinalizeConfirm, setShowFinalizeConfirm] = useState(false);
   const [recoverDismissed, setRecoverDismissed] = useState(false);
+
+  // The realtime session's SOAP arrives asynchronously (server sends
+  // "soap_ready" once, after {"type":"stop"}) — apply it into the same
+  // session state a batch /transcribe response would populate as soon as
+  // it shows up, however long after handleStopRecording() already returned.
+  useEffect(() => {
+    if (realtime.soapResponse) {
+      applyRealtimeResult(realtime.soapResponse);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [realtime.soapResponse]);
+
+  useEffect(() => {
+    if (realtime.connectionError) {
+      setToastMessage(realtime.connectionError);
+    }
+  }, [realtime.connectionError]);
 
   const showRecoverModal = recorder.recoverableBackup !== null && !recoverDismissed;
 
@@ -70,7 +95,32 @@ export default function ConsultationPage() {
     return () => window.removeEventListener("beforeunload", handler);
   }, [recorder.recorderStatus, status]);
 
+  async function handleStartRecording() {
+    if (REALTIME_ENABLED) {
+      try {
+        await realtime.start();
+      } catch (err) {
+        setToastMessage(
+          err instanceof Error ? err.message : "Não foi possível iniciar a transcrição em tempo real.",
+        );
+        return;
+      }
+    }
+    void recorder.startRecording();
+  }
+
   async function handleStopRecording() {
+    // The MediaRecorder keeps recording either way (archival copy + fallback
+    // if the WS session never delivers "soap_ready") — only what happens
+    // with its blob differs: in realtime mode, SOAP comes from the WS
+    // session itself (applyRealtimeResult, via the effect above), so the
+    // batch upload+transcribe call is skipped entirely.
+    if (REALTIME_ENABLED && realtime.isActive) {
+      realtime.stop();
+      await recorder.stopRecording();
+      return;
+    }
+
     const blobs = await recorder.stopRecording();
     if (!blobs || blobs.length === 0) return;
 
@@ -171,7 +221,7 @@ export default function ConsultationPage() {
             lowAudioWarning={recorder.lowAudioWarning}
             micBlocked={recorder.micBlocked}
             onFileSelected={uploadAndTranscribe}
-            onStartRecording={() => void recorder.startRecording()}
+            onStartRecording={() => void handleStartRecording()}
             onPauseRecording={recorder.pauseRecording}
             onResumeRecording={recorder.resumeRecording}
             onStopRecording={() => void handleStopRecording()}
@@ -192,7 +242,8 @@ export default function ConsultationPage() {
         }
         right={
           <TranscriptPanel
-            segments={filteredSegments}
+            segments={REALTIME_ENABLED && realtime.isActive ? realtime.segments : filteredSegments}
+            live={REALTIME_ENABLED && realtime.isActive}
             searchQuery={searchQuery}
             onSearchChange={setSearchQuery}
             onRenameSpeaker={updateSegmentSpeaker}
