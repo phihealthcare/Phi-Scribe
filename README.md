@@ -239,7 +239,7 @@ cp .env.example .env
 python run.py
 ```
 
-`faster-whisper`, `torch`, `pyannote.audio` (diarization), and `nvidia-cublas-cu12` are already included in `requirements.txt` — no separate install step needed.
+`faster-whisper`, `torch`, and `nvidia-cublas-cu12` are already included in `requirements.txt` — no separate install step needed.
 
 For **GPU** (`WHISPER_FASTER_DEVICE=cuda`), `nvidia-cublas-cu12` is needed because `faster-whisper` uses CUDA 12 libraries while PyTorch (Silero VAD) uses CUDA 13. Without it you may see: `Library libcublas.so.12 is not found`.
 
@@ -247,14 +247,7 @@ Production will use the **OpenAI Whisper API** wired to our LLM. `faster-whisper
 
 **System dependency:** `ffmpeg` (audio conversion).
 
-**Sortformer diarization backend (optional):** `DIARIZATION_BACKEND=sortformer` is an alternate diarization backend to the default `pyannote.audio` one. It runs `benchmarks/sortformer_worker.py` in its own **separate virtualenv** — `nemo_toolkit` conflicts with `pyannote.audio`'s dependencies if installed in the main `.venv`. Create it once, only if you plan to use this backend:
-
-```bash
-python3 -m venv .venv-sortformer
-.venv-sortformer/bin/pip install nemo_toolkit[asr]
-```
-
-Not required for the default (`pyannote.audio`) diarization path.
+**Sortformer diarization backend:** speaker diarization (`DIARIZATION_ENABLED=true`) uses NVIDIA NeMo Sortformer (`nvidia/diar_sortformer_4spk-v1`), run via `benchmarks/sortformer_worker.py`/`benchmarks/sortformer_daemon.py` in a separate OS subprocess of the same interpreter running Flask (for GPU-memory eviction and crash isolation, not dependency isolation — `nemo_toolkit[asr]` and its pinned `onnx`/`ml_dtypes`/`protobuf`/`numpy` versions are already in `requirements.txt`; no separate venv needed).
 
 **Optional preprocessing variables** (`.env`):
 

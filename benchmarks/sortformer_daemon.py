@@ -4,9 +4,10 @@
 Keeps NeMo imported and the model loaded in GPU memory across many
 diarization requests, instead of paying the ~4s NeMo import + ~1.6s model
 load cost on every single call (as the one-shot benchmarks/sortformer_worker.py
-does, invoked fresh per request). Runs in the isolated .venv-sortformer/ venv
-for the same reason sortformer_worker.py does — NeMo conflicts with
-pyannote.audio if installed in the main venv.
+does, invoked fresh per request). Runs as its own OS process (whichever
+interpreter app/services/diarization_sortformer.py's DEFAULT_VENV_PYTHON
+points at) so a NeMo/CUDA crash only kills this disposable subprocess, and so
+exiting on idle timeout reliably frees its GPU memory back to the driver.
 
 Listens on a Unix domain socket, one request per connection. See
 app/services/diarization_sortformer.py (_ensure_daemon, _daemon_request) for

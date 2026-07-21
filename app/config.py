@@ -153,20 +153,10 @@ class Config:
         "1",
         "yes",
     }
-    DIARIZATION_NUM_SPEAKERS = int(os.environ.get("DIARIZATION_NUM_SPEAKERS", 2))
     DIARIZATION_MIN_TURN_MS = int(os.environ.get("DIARIZATION_MIN_TURN_MS", 400))
-    DIARIZATION_MODEL = os.environ.get(
-        "DIARIZATION_MODEL", "pyannote/speaker-diarization-community-1"
-    )
-    DIARIZATION_DEVICE = os.environ.get("DIARIZATION_DEVICE", "").strip() or None
-    HF_TOKEN = os.environ.get("HF_TOKEN", "").strip() or None
 
-    # Experimental alternative diarization backend (nvidia/diar_sortformer_4spk-v1
-    # via NeMo, run in an isolated .venv-sortformer/ subprocess — see
-    # app/services/diarization_sortformer.py for why it's isolated). Only takes
-    # effect when DIARIZATION_ENABLED is also true; "pyannote" (default) keeps
-    # today's behavior unchanged.
-    DIARIZATION_BACKEND = os.environ.get("DIARIZATION_BACKEND", "pyannote").strip().lower()
+    # Diarization backend: nvidia/diar_sortformer_4spk-v1 via NeMo. Only takes
+    # effect when DIARIZATION_ENABLED is also true.
     SORTFORMER_MODEL_ID = os.environ.get("SORTFORMER_MODEL_ID", "nvidia/diar_sortformer_4spk-v1")
     SORTFORMER_DEVICE = os.environ.get("SORTFORMER_DEVICE", "cuda")
     # Per-call ceiling — Sortformer's VRAM use scales much faster than linearly
@@ -187,6 +177,27 @@ class Config:
     # reached, so this is safe to leave on; set false only to force the old
     # one-shot-per-call behavior (e.g. while debugging).
     SORTFORMER_USE_DAEMON = os.environ.get("SORTFORMER_USE_DAEMON", "true").strip().lower() in {"true", "1", "yes"}
+
+    # Live transcription+diarization over a WebSocket, instead of the batch
+    # upload-then-transcribe flow. Off by default — only registers the
+    # realtime blueprint (see app/routes/realtime.py) when true.
+    REALTIME_TRANSCRIPTION_ENABLED = os.environ.get(
+        "REALTIME_TRANSCRIPTION_ENABLED", "false"
+    ).strip().lower() in {"true", "1", "yes"}
+    # Rolling Whisper re-transcription window/fallback cadence (see
+    # app/services/transcribe_realtime.py).
+    REALTIME_WINDOW_S = float(os.environ.get("REALTIME_WINDOW_S", 10))
+    REALTIME_STEP_S = float(os.environ.get("REALTIME_STEP_S", 2))
+    # Rolling Sortformer diarization window/overlap (see
+    # app/services/diarization_realtime.py) — deliberately shorter than
+    # SORTFORMER_CHUNK_S above (a live window doesn't need to amortize a
+    # daemon round-trip over minutes of audio the way batch chunking does).
+    REALTIME_DIARIZATION_WINDOW_S = float(os.environ.get("REALTIME_DIARIZATION_WINDOW_S", 30))
+    REALTIME_DIARIZATION_OVERLAP_S = float(os.environ.get("REALTIME_DIARIZATION_OVERLAP_S", 10))
+    # Safety ceiling — force-finalize a live session if it runs this long
+    # without the client sending {"type": "stop"} (default 3h).
+    REALTIME_MAX_SESSION_S = float(os.environ.get("REALTIME_MAX_SESSION_S", 10800))
+
     TRANSCRIPT_POSTPROCESS_ENABLED = os.environ.get(
         "TRANSCRIPT_POSTPROCESS_ENABLED",
         "false",
@@ -213,9 +224,10 @@ class Config:
         "TRANSCRIPT_DIARIZATION_LABELS_ENABLED",
         "false",
     ).lower() in {"true", "1", "yes"}
-    # LLM-only diarization (no pyannote): split plain ASR-fixed text into
-    # Doutor:/Paciente: turns. Runs after ASR fix, before SOAP. Independent of
-    # DIARIZATION_ENABLED/TRANSCRIPT_DIARIZATION_LABELS_ENABLED (pyannote path).
+    # LLM-only diarization (no acoustic diarization model): split plain
+    # ASR-fixed text into Doutor:/Paciente: turns. Runs after ASR fix, before
+    # SOAP. Independent of DIARIZATION_ENABLED/TRANSCRIPT_DIARIZATION_LABELS_ENABLED
+    # (the Sortformer-based path).
     MANUAL_DIARIZATION_PROMPT_PATH = os.environ.get(
         "MANUAL_DIARIZATION_PROMPT_PATH",
         "benchmarks/prompts/medical-transcript-manual-diarization.md",

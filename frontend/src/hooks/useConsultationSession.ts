@@ -7,6 +7,7 @@ import type {
   ConsultationSession,
   ConsultationStatus,
   SoapSections,
+  TranscribeResponse,
   TranscriptSegment,
 } from "../api/types";
 import { validateAudioFile } from "../api/validateAudioFile";
@@ -192,6 +193,28 @@ export function useConsultationSession() {
     await runTranscribe(lastFileId);
   }
 
+  /**
+   * Applies the final result from a live realtime session
+   * (useRealtimeTranscription's "soap_ready" event, app/routes/realtime.py) —
+   * the exact same TranscribeResponse shape a batch /transcribe call returns,
+   * so it reuses the same parse helpers as runTranscribe(). SOAP itself was
+   * never made incremental; this only replaces the source of the final
+   * transcript (live-accumulated instead of post-hoc), same as the plan
+   * called for.
+   */
+  function applyRealtimeResult(response: TranscribeResponse): void {
+    const newSoap = extractSoapSections(response);
+    setSegments(extractSegments(response));
+    setSoapSections(newSoap);
+    setSoapRevision((r) => r + 1);
+    setEntities(extractEntities(newSoap));
+    setSoapEdited(false);
+    setLastFileId(response.file_id);
+    setError(null);
+    setErrorPhase(null);
+    setStatus("done");
+  }
+
   function dismissError() {
     setError(null);
     setErrorPhase(null);
@@ -230,6 +253,7 @@ export function useConsultationSession() {
     filteredSegments,
     uploadAndTranscribe,
     retryTranscribe,
+    applyRealtimeResult,
     dismissError,
     resetSession,
   };

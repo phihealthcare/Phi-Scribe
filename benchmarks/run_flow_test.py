@@ -59,7 +59,7 @@ def main() -> int:
     parser.add_argument(
         "--no-diarization",
         action="store_true",
-        help="Skip pyannote (faster; matches historical WER benchmark methodology)",
+        help="Skip diarization (faster; matches historical WER benchmark methodology)",
     )
     parser.add_argument(
         "--output",

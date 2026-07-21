@@ -1,10 +1,9 @@
 #!/usr/bin/env python3
 """Standalone Sortformer (nvidia/diar_sortformer_4spk-v1) diarization worker.
 
-Runs in its OWN virtualenv (.venv-sortformer/), completely isolated from the
-main project's dependencies. Installing NeMo in the main venv breaks
-pyannote.audio (confirmed: protobuf/onnx version conflict) — this script is
-the boundary that keeps that risk contained. See
+Runs as its own OS process (see DEFAULT_VENV_PYTHON in
+app/services/diarization_sortformer.py for which interpreter launches it) so
+a NeMo/CUDA crash here can't take down the main Flask process. See
 app/services/diarization_sortformer.py for the subprocess bridge that calls
 this from the main app.
 

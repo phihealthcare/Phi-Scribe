@@ -6,6 +6,7 @@ import time
 import uuid
 from contextlib import nullcontext
 from pathlib import Path
+from typing import Any
 
 from flask import Blueprint, current_app, jsonify, request
 from werkzeug.utils import secure_filename
@@ -25,7 +26,7 @@ from app.services.pipeline_steps import (
     soap_split_enabled_for_config,
 )
 from app.services.llm_client import warm_up_llm
-from app.services.pipeline_tracker import tracker_from_config
+from app.services.pipeline_tracker import PipelineTracker, tracker_from_config
 from app.services.transcribe_diarized import (
     diarization_options_from_mapping,
     transcribe_wav_diarized,
@@ -181,6 +182,32 @@ def _run_transcription(audio_path: Path, *, file_id: str, preprocessing: str) ->
         if temp_wav_path is not None:
             temp_wav_path.unlink(missing_ok=True)
 
+    return _postprocess_and_soap(
+        transcription,
+        config=config,
+        tracker=tracker,
+        file_id=file_id,
+        preprocessing=preprocessing,
+        audio_path=audio_path,
+        diarization_enabled=diarization_enabled,
+    )
+
+
+def _postprocess_and_soap(
+    transcription: dict,
+    *,
+    config: Any,
+    tracker: PipelineTracker | None,
+    file_id: str,
+    preprocessing: str,
+    audio_path: Path | str,
+    diarization_enabled: bool,
+) -> tuple[dict, int]:
+    """LLM postprocess (ASR-fix, diarization-labels) + SOAP draft generation,
+    given an already-produced `transcription` dict (text/segments/run) — used
+    by both the batch REST flow above and RealtimeConsultationSession.stop()
+    (app/services/realtime_session.py), which only needs to run this once,
+    when the live session ends."""
     raw_text = str(transcription.get("text", ""))
     postprocess_enabled = bool(config.get("TRANSCRIPT_POSTPROCESS_ENABLED"))
     soap_enabled = bool(postprocess_enabled and soap_enabled_for_config(config))
@@ -267,7 +294,7 @@ def _run_transcription(audio_path: Path, *, file_id: str, preprocessing: str) ->
         if soap_enabled:
             # SOAP's prompts branch on whether the transcript text actually has
             # Médico:/Doutor:/Paciente: line labels — that's `postprocess_applied`
-            # (true when either the pyannote relabel step or manual diarization
+            # (true when either the diarization-labels relabel step or manual diarization
             # actually succeeded), not the raw DIARIZATION_ENABLED flag. Using the
             # raw flag here caused a mismatch when manual diarization succeeded
             # (labels present) while DIARIZATION_ENABLED stayed false: the SOAP

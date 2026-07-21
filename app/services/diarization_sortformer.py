@@ -1,17 +1,17 @@
-"""Sortformer (nvidia/diar_sortformer_4spk-v1) diarization backend — an
-alternative to app/services/diarization.py's pyannote pipeline.
+"""Sortformer (nvidia/diar_sortformer_4spk-v1) diarization — the only
+diarization backend in this app (pyannote.audio was removed; NeMo used to be
+isolated in a separate .venv-sortformer/ purely because NeMo's dependency
+tree conflicted with pyannote.audio installed in the same environment —
+that reason no longer applies now that pyannote is gone).
 
-This module deliberately does NOT import nemo/torch-for-nemo at all. NeMo's
-dependency tree conflicts with pyannote.audio when installed in the same
-environment (confirmed: downgrades protobuf/pyannote-core/etc. and breaks
-pyannote imports with a protobuf/onnx version mismatch). To keep pyannote
-safe, Sortformer runs as a subprocess in its own virtualenv
-(.venv-sortformer/, see benchmarks/sortformer_worker.py) — this file is just
-the bridge that shells out and parses the result.
-
-Removing this backend: delete this file, benchmarks/sortformer_worker.py,
-.venv-sortformer/, and the DIARIZATION_BACKEND/SORTFORMER_* config block.
-Nothing else in the codebase references any of that.
+This module deliberately does NOT import nemo/torch-for-nemo directly.
+Sortformer runs as a subprocess (see benchmarks/sortformer_worker.py /
+sortformer_daemon.py) — this file is just the bridge that shells out and
+parses the result. The subprocess boundary is kept independent of which venv
+supplies the interpreter (see DEFAULT_VENV_PYTHON) because it also provides
+GPU-memory eviction (the daemon frees VRAM by exiting after an idle timeout)
+and crash isolation (a NeMo/CUDA crash only kills the disposable subprocess),
+not just dependency isolation.
 """
 from __future__ import annotations
 
@@ -27,10 +27,13 @@ import wave
 from pathlib import Path
 from typing import Any
 
-from app.services import diarization
+from app.services import wav_utils
 
 ROOT = Path(__file__).resolve().parents[2]
-DEFAULT_VENV_PYTHON = ROOT / ".venv-sortformer" / "bin" / "python"
+# NeMo's deps now live in the main venv (see requirements.txt) — the daemon
+# subprocess just uses whichever interpreter is running this code. Override
+# via SORTFORMER_VENV_PYTHON if you ever need a different interpreter again.
+DEFAULT_VENV_PYTHON = Path(sys.executable)
 WORKER_SCRIPT = ROOT / "benchmarks" / "sortformer_worker.py"
 DAEMON_SCRIPT = ROOT / "benchmarks" / "sortformer_daemon.py"
 DEFAULT_MODEL_ID = "nvidia/diar_sortformer_4spk-v1"
@@ -423,14 +426,14 @@ def diarize_wav_sortformer_chunked(
     # Read the source WAV once — extract_turn_wav() would otherwise re-read
     # the whole file from disk per chunk, which gets expensive on long
     # recordings (e.g. ~23 chunks for a 60min consultation).
-    audio, _sample_rate = diarization._read_wav(wav_path)
+    audio, _sample_rate = wav_utils.read_wav(wav_path)
 
     with tempfile.TemporaryDirectory(prefix="phi-scribe-sortformer-chunks-") as tmp_dir:
         tmp_path = Path(tmp_dir)
         chunk_wav_paths = []
         for index, (start_s, end_s) in enumerate(boundaries):
             chunk_wav = tmp_path / f"chunk_{index:02d}.wav"
-            diarization._write_wav_slice(
+            wav_utils.write_wav_slice(
                 chunk_wav,
                 audio,
                 start_ms=int(start_s * 1000),

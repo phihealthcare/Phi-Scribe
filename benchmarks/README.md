@@ -158,7 +158,7 @@ python benchmarks/score_transcripts.py ... --remove-fillers
 
 ## Speaker inference test (LLM-only, no diarization)
 
-Test whether the LLM can assign `Autor:` / `Paciente:` **per turn** from plain Whisper text **without** pyannote diarization.
+Test whether the LLM can assign `Autor:` / `Paciente:` **per turn** from plain Whisper text **without** acoustic diarization.
 Each turn includes `rotulo`, `identificavel`, `confianca` and `motivo`. The model fills `identificacao` first, then `turnos`.
 
 ```bash
@@ -187,7 +187,7 @@ Pair with `run_flow_test.py --no-diarization` to generate `01_whisper_raw.txt` f
 ## ASR fix only (improve text, no SOAP, no diarization)
 
 Runs **only** the LLM editor prompt (`medical-transcript-editor.md`) on Whisper output.
-No pyannote, no Médico/Paciente labels, no SOAP.
+No diarization, no Médico/Paciente labels, no SOAP.
 
 ```bash
 # Full path: preprocess → Whisper → LLM improve

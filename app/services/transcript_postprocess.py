@@ -256,7 +256,7 @@ def load_diarization_label_prompt(*, prompt_path: Path | None = None) -> str:
 
 
 def manual_diarization_enabled(config: Mapping[str, Any]) -> bool:
-    """LLM-only diarization (no pyannote): split plain text into Doutor:/Paciente: turns."""
+    """LLM-only diarization (no acoustic diarization model): split plain text into Doutor:/Paciente: turns."""
     raw = config.get("MANUAL_DIARIZATION_ENABLED")
     if raw is None:
         return False
@@ -1226,16 +1226,17 @@ def manual_diarize_transcript(
     chunk_max_words: int = 0,
 ) -> dict[str, Any]:
     """LLM-only diarization: split plain (non-diarized) text into Doutor:/Paciente:
-    turns. No pyannote involved. Guarded the same way as the ASR-fix step
-    (asr_fix_output_passes_guardrail) — if the model summarizes instead of just
-    splitting/labeling, fall back to the plain, unlabeled input instead of
-    silently accepting a shortened transcript.
+    turns. No acoustic diarization model involved. Guarded the same way as the
+    ASR-fix step (asr_fix_output_passes_guardrail) — if the model summarizes
+    instead of just splitting/labeling, fall back to the plain, unlabeled input
+    instead of silently accepting a shortened transcript.
 
     Long transcripts (~1000+ words) reliably lose whole dense/technical spans
     (lab reports, exam-history review) when diarized in one LLM call — chunking
     keeps each call short enough to stay complete, at the cost of needing the
     previous chunk's tail as context so Doutor/Paciente roles stay consistent
-    across chunks (there's no acoustic speaker id to anchor to, unlike pyannote)."""
+    across chunks (there's no acoustic speaker id to anchor to here, unlike the
+    Sortformer-based diarization path)."""
     result = _llm_stage_result(
         text=text,
         provider=provider,

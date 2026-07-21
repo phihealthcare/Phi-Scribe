@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Test LLM Autor/Paciente labeling per turn from plain Whisper text (no pyannote diarization)."""
+"""Test LLM Autor/Paciente labeling per turn from plain Whisper text (no acoustic diarization)."""
 from __future__ import annotations
 
 import argparse

@@ -33,9 +33,9 @@ from app.services import transcribe  # noqa: E402
 from app.services.diarization_sortformer import diarize_wav_sortformer_chunked  # noqa: E402
 from app.services.transcribe_diarized import (  # noqa: E402
     _collect_words,
-    _format_speaker_transcript,
     _segments_from_aligned_words,
-    _speaker_label_map,
+    format_speaker_transcript,
+    speaker_label_map,
 )
 from benchmarks.score import load_reference_text, score_transcript  # noqa: E402
 from benchmarks.score_diarization import parse_labeled_lines  # noqa: E402
@@ -79,13 +79,13 @@ def _run_stack(
     diarization_s = time.perf_counter() - t0
 
     alignment_turns = diarization_result.get("alignment_turns") or diarization_result["turns"]
-    speaker_label_mapping = _speaker_label_map(diarization_result.get("speakers", []))
+    speaker_label_mapping = speaker_label_map(diarization_result.get("speakers", []))
     segments = _segments_from_aligned_words(
         words,
         alignment_turns=alignment_turns,
         speaker_label_mapping=speaker_label_mapping,
     )
-    labeled_text = _format_speaker_transcript(segments)
+    labeled_text = format_speaker_transcript(segments)
 
     return {
         "stack_id": stack_id,
